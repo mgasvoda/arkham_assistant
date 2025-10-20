@@ -1,0 +1,34 @@
+---
+description: Core project standards for Arkham Assistant
+alwaysApply: true
+---
+
+# Arkham Assistant Project Standards
+
+## Code Quality
+
+- Major functionality MUST have basic tests covering core behavior
+- Tests should be placed in appropriate test directories matching the source structure
+- Prefer utility functions in dedicated modules over inline implementations
+- Extract and generalize repeated logic into reusable utility functions
+
+## Documentation
+
+- **CRITICAL**: When modifying functionality, update relevant design documents in `/docs`:
+  - `frontend_design.md` - for React components, UI, API integration
+  - `ai_agent_design.md` - for AI agent tools, prompts, conversation flows
+  - `simulation_design.md` - for simulation engine, metrics, algorithms
+  - `database_crud_design.md` - for ChromaDB schema, CRUD operations, data models
+  - `data_retrieval_design.md` - for ArkhamDB API integration, data import
+  - `architecture_overview.md` - for system-wide architectural changes
+
+- **DO NOT** create new markdown or documentation files unless explicitly instructed
+- Keep documentation updates concise and focused on material changes
+- Update inline code comments for complex logic
+
+## Code Organization
+
+- Keep functions focused and single-purpose
+- Use clear, descriptive names for functions and variables
+- Organize code into logical modules and packages
+- Avoid deep nesting - extract complex logic into helper functions

@@ -1,0 +1,35 @@
+---
+description: Ensures design documentation stays synchronized with code changes
+globs: ["docs/*.md"]
+alwaysApply: false
+---
+
+# Documentation Update Requirements
+
+When working with or referencing design documentation files, you MUST update them if:
+
+1. **API endpoints change** → Update relevant design doc
+2. **Database schema changes** → Update `database_crud_design.md`
+3. **New AI agent tools added** → Update `ai_agent_design.md`
+4. **Simulation metrics change** → Update `simulation_design.md`
+5. **Frontend components change** → Update `frontend_design.md`
+6. **Data import process changes** → Update `data_retrieval_design.md`
+7. **System architecture changes** → Update `architecture_overview.md`
+
+## Update Guidelines
+
+- Keep updates concise and focused on what changed
+- Update relevant sections (endpoints, schemas, examples, etc.)
+- Maintain consistent formatting with existing documentation
+- Update code examples if they're affected by changes
+
+## Existing Documentation Files (DO NOT CREATE NEW ONES)
+
+- `docs/architecture_overview.md` - System design overview
+- `docs/frontend_design.md` - React frontend specifications
+- `docs/ai_agent_design.md` - AI agent tools and workflows
+- `docs/simulation_design.md` - Simulation engine design
+- `docs/database_crud_design.md` - ChromaDB and CRUD services
+- `docs/data_retrieval_design.md` - ArkhamDB data import utility
+
+**IMPORTANT**: Do not create additional documentation files unless explicitly instructed.

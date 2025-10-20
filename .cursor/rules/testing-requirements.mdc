@@ -1,0 +1,88 @@
+---
+description: Python testing standards and requirements for backend functionality
+globs: ["backend/**/*.py", "scripts/**/*.py", "tests/**/*.py"]
+alwaysApply: false
+---
+
+# Testing Requirements
+
+## When to Write Tests
+
+Write tests for:
+- All API endpoints (test request/response)
+- Core business logic (simulation, deck analysis)
+- Data transformations (ArkhamDB → ChromaDB mapping)
+- Database operations (CRUD functions)
+- AI agent tools (tool function behavior)
+- Utility functions used across modules
+
+## Test Structure
+
+```
+tests/
+├── backend/
+│   ├── test_simulator.py
+│   ├── test_chroma_client.py
+│   ├── test_agent_tools.py
+│   └── api/
+│       ├── test_cards.py
+│       ├── test_decks.py
+│       └── test_chat.py
+├── scripts/
+│   └── test_fetch_arkhamdb.py
+└── conftest.py  # Shared fixtures
+```
+
+## Testing Patterns
+
+### Python Tests (pytest)
+
+```python
+import pytest
+from backend.services.simulator import run_simulation
+
+def test_simulation_returns_valid_metrics():
+    """Test that simulation produces expected metric structure."""
+    deck_id = "test_deck_001"
+    result = run_simulation(deck_id, n_trials=100)
+    
+    assert "avg_setup_time" in result["metrics"]
+    assert 0 <= result["metrics"]["success_rate"] <= 1
+    assert result["n_trials"] == 100
+
+@pytest.fixture
+def sample_deck():
+    """Fixture providing a test deck."""
+    return {
+        "id": "test_deck_001",
+        "character_id": "01001",
+        "card_list": ["01001", "01002", ...],
+    }
+```
+
+## Test Coverage Goals
+
+- Core business logic: 80%+ coverage
+- API endpoints: Basic happy path + error cases
+- Utilities: Test edge cases and error handling
+
+## Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/backend/test_simulator.py
+
+# Run with coverage
+pytest --cov=backend --cov-report=html
+```
+
+## Test Quality
+
+- Tests should be fast (mock external dependencies)
+- Tests should be isolated (no shared state between tests)
+- Use fixtures for common setup
+- Test both success and failure paths
+- Keep tests simple and readable

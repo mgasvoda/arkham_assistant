@@ -1,0 +1,57 @@
+---
+description: Python-specific conventions and tooling for Arkham Assistant
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Python Conventions
+
+## Dependency Management
+
+- **ALWAYS** use `uv` for dependency management
+- Add dependencies with: `uv add <package>`
+- Update dependencies with: `uv sync`
+- Pin versions in `pyproject.toml` for reproducibility
+- Document major dependencies in relevant design docs
+
+## Code Quality & Linting
+
+- Use `ruff` for linting and formatting
+- Run linting with: `ruff check .`
+- Auto-fix issues with: `ruff check --fix .`
+- Format code with: `ruff format .`
+- All Python files must pass ruff checks before committing
+
+## Style Guidelines
+
+- Follow PEP 8 conventions (enforced by ruff)
+- Use type hints for function signatures
+- Prefer explicit over implicit (readability counts)
+- Use descriptive variable names (no single letters except for iterators)
+
+## Testing
+
+- Use `pytest` for testing
+- Place tests in `tests/` directory mirroring source structure
+- Name test files: `test_<module_name>.py`
+- Name test functions: `test_<function_name>_<scenario>`
+- Use fixtures for shared test setup
+
+## Example Structure
+
+```python
+from typing import List, Optional
+from pydantic import BaseModel
+
+def calculate_deck_curve(card_costs: List[int]) -> dict[int, float]:
+    """Calculate resource cost distribution for a deck.
+    
+    Args:
+        card_costs: List of resource costs for all cards in deck
+        
+    Returns:
+        Dictionary mapping cost to frequency percentage
+    """
+    # Implementation
+    pass
+```

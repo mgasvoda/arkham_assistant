@@ -1,0 +1,34 @@
+---
+description: Prevents creation of unnecessary documentation files
+alwaysApply: true
+---
+
+# Documentation File Policy
+
+## STRICT RULE: No New Documentation Files
+
+**DO NOT** create new markdown or documentation files unless the user explicitly requests it.
+
+All necessary documentation already exists:
+- `/docs/architecture_overview.md`
+- `/docs/frontend_design.md`
+- `/docs/ai_agent_design.md`
+- `/docs/simulation_design.md`
+- `/docs/database_crud_design.md`
+- `/docs/data_retrieval_design.md`
+
+## What to Do Instead
+
+- Update existing documentation files when functionality changes
+- Add inline code comments for complex logic
+- Use docstrings for function/class documentation
+- Keep README.md minimal and focused on setup/usage
+
+## Exceptions
+
+Only create new documentation if the user explicitly says:
+- "Create a new doc for..."
+- "Add a markdown file for..."
+- "Document this in a new file..."
+
+Otherwise, always update existing docs or use inline documentation.

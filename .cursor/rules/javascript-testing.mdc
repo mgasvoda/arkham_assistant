@@ -1,0 +1,327 @@
+---
+description: JavaScript/React testing standards with automated browser console checking
+globs: ["frontend/**/*.{js,jsx,ts,tsx}", "**/*.test.{js,jsx,ts,tsx}"]
+alwaysApply: false
+---
+
+# JavaScript Testing Standards
+
+## Testing Strategy
+
+### Unit Tests: Vitest
+- Use **Vitest** for component and utility testing (native Vite integration)
+- Test React components with `@testing-library/react`
+- Mock API calls and external dependencies
+- Keep tests fast and focused
+
+### E2E Tests: Playwright
+- Use **Playwright** for end-to-end testing with real browser
+- Automatically detect console errors during test runs
+- Verify successful rendering and user interactions
+- Run after every major change to catch integration issues
+
+---
+
+## E2E Testing with Console Error Detection
+
+### Setup (Playwright)
+
+Install dependencies:
+```bash
+npm install -D @playwright/test
+npx playwright install chromium
+```
+
+### Test Structure
+
+```
+frontend/
+├── tests/
+│   ├── e2e/
+│   │   ├── app-loads.spec.js
+│   │   ├── deck-builder.spec.js
+│   │   └── chat-window.spec.js
+│   └── unit/
+│       ├── DeckBuilder.test.jsx
+│       └── utils.test.js
+└── playwright.config.js
+```
+
+### Example E2E Test with Console Monitoring
+
+```javascript
+// tests/e2e/app-loads.spec.js
+import { test, expect } from '@playwright/test';
+
+test('frontend loads without console errors', async ({ page }) => {
+  const consoleErrors = [];
+  
+  // Capture console errors
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+  
+  // Capture page errors
+  page.on('pageerror', error => {
+    consoleErrors.push(error.message);
+  });
+  
+  // Load the app
+  await page.goto('http://localhost:5173');
+  
+  // Wait for app to be interactive
+  await page.waitForLoadState('networkidle');
+  
+  // Check for successful render
+  await expect(page.locator('body')).toBeVisible();
+  
+  // Assert no console errors occurred
+  expect(consoleErrors).toHaveLength(0);
+  
+  if (consoleErrors.length > 0) {
+    console.error('Console errors detected:', consoleErrors);
+  }
+});
+
+test('deck builder view renders correctly', async ({ page }) => {
+  const consoleErrors = [];
+  
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  
+  await page.goto('http://localhost:5173');
+  
+  // Test deck builder specific functionality
+  await expect(page.locator('[data-testid="deck-builder"]')).toBeVisible();
+  
+  expect(consoleErrors).toHaveLength(0);
+});
+```
+
+### Playwright Config
+
+```javascript
+// playwright.config.js
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
+});
+```
+
+---
+
+## Unit Testing with Vitest
+
+### Setup
+
+```bash
+npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+```
+
+### Example Unit Test
+
+```javascript
+// tests/unit/DeckBuilder.test.jsx
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import DeckBuilder from '../../src/components/DeckBuilder';
+
+describe('DeckBuilder', () => {
+  it('renders without crashing', () => {
+    render(<DeckBuilder />);
+    expect(screen.getByTestId('deck-builder')).toBeInTheDocument();
+  });
+  
+  it('displays empty deck message initially', () => {
+    render(<DeckBuilder />);
+    expect(screen.getByText(/no cards in deck/i)).toBeInTheDocument();
+  });
+});
+```
+
+### Vitest Config
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './tests/setup.js',
+  },
+});
+```
+
+---
+
+## Testing Workflow
+
+### Development Testing
+```bash
+# Run unit tests (watch mode)
+npm run test
+
+# Run E2E tests (with browser)
+npm run test:e2e
+
+# Run E2E tests (headless)
+npm run test:e2e:ci
+```
+
+### Pre-Commit Testing
+Run before committing major changes:
+```bash
+# Run all tests
+npm run test:all
+
+# This should include:
+# 1. Unit tests (vitest)
+# 2. E2E tests with console checking (playwright)
+# 3. Linting (eslint)
+```
+
+### Add to package.json
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --reporter=list",
+    "test:all": "npm run test -- --run && npm run test:e2e:ci"
+  }
+}
+```
+
+---
+
+## Testing Requirements
+
+### When to Write Tests
+
+**Unit tests** for:
+- React components (render correctly, handle props)
+- Utility functions (data transformations, calculations)
+- API client functions (request formatting, response parsing)
+- Context providers (state management)
+
+**E2E tests** for:
+- Critical user flows (deck creation, card search, AI chat)
+- Page loads without console errors
+- Integration between components
+- API integration (with mock backend)
+
+### Test Quality Standards
+
+- **Fast**: Unit tests should complete in < 1s, E2E tests in < 10s per test
+- **Isolated**: No shared state between tests
+- **Descriptive**: Test names clearly describe what's being tested
+- **Maintainable**: Avoid testing implementation details
+- **Console-clean**: E2E tests MUST verify no console errors
+
+---
+
+## Console Error Patterns to Catch
+
+Playwright tests will catch:
+- **Runtime errors**: Undefined variables, null references
+- **React errors**: Invalid hooks usage, component errors
+- **Network errors**: Failed API calls (if not properly handled)
+- **Warning escalation**: Can configure to treat warnings as failures
+
+### Example: Strict Console Monitoring
+
+```javascript
+test('app runs without any console warnings or errors', async ({ page }) => {
+  const consoleMessages = [];
+  
+  page.on('console', msg => {
+    if (['error', 'warning'].includes(msg.type())) {
+      consoleMessages.push({ type: msg.type(), text: msg.text() });
+    }
+  });
+  
+  await page.goto('http://localhost:5173');
+  await page.waitForLoadState('networkidle');
+  
+  // No errors or warnings allowed
+  expect(consoleMessages).toHaveLength(0);
+});
+```
+
+---
+
+## CI Integration
+
+### GitHub Actions Example
+
+```yaml
+name: Frontend Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test -- --run
+      
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      
+      - name: Run E2E tests
+        run: npm run test:e2e:ci
+      
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test-results/
+```
+
+---
+
+## Implementation Notes
+
+- Use `data-testid` attributes for stable test selectors
+- Mock backend API responses in E2E tests when appropriate
+- Keep E2E tests focused on user interactions, not implementation
+- Run E2E tests after every major component or API change
+- Document test failures and fix immediately (don't accumulate tech debt)
+- Update `frontend_design.md` when adding new testable features
