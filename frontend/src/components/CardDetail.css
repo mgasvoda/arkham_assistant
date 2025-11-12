@@ -4,6 +4,32 @@
   height: 100%;
   overflow: hidden;
   background: white;
+  border-radius: 8px;
+}
+
+/* Class-specific header accents */
+.card-detail.class-guardian {
+  border-top: 4px solid #2563eb;
+}
+
+.card-detail.class-seeker {
+  border-top: 4px solid #f59e0b;
+}
+
+.card-detail.class-rogue {
+  border-top: 4px solid #10b981;
+}
+
+.card-detail.class-mystic {
+  border-top: 4px solid #a855f7;
+}
+
+.card-detail.class-survivor {
+  border-top: 4px solid #ef4444;
+}
+
+.card-detail.class-neutral {
+  border-top: 4px solid #9ca3af;
 }
 
 .detail-header {
@@ -87,27 +113,29 @@
 }
 
 .class-badge.guardian {
-  background: #1e40af;
+  background: #2563eb;
 }
 
 .class-badge.seeker {
   background: #f59e0b;
+  color: #1f2937;
 }
 
 .class-badge.rogue {
-  background: #059669;
+  background: #10b981;
+  color: #1f2937;
 }
 
 .class-badge.mystic {
-  background: #7c3aed;
+  background: #a855f7;
 }
 
 .class-badge.survivor {
-  background: #dc2626;
+  background: #ef4444;
 }
 
 .class-badge.neutral {
-  background: #6b7280;
+  background: #9ca3af;
 }
 
 .traits {
@@ -150,6 +178,53 @@
   font-weight: 500;
   color: #ef4444;
   margin: 0;
+}
+
+.skill-icons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.skill-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  min-width: 70px;
+}
+
+.skill-icon.willpower {
+  background: #3b82f6;
+  color: white;
+}
+
+.skill-icon.intellect {
+  background: #f59e0b;
+  color: #1f2937;
+}
+
+.skill-icon.combat {
+  background: #ef4444;
+  color: white;
+}
+
+.skill-icon.agility {
+  background: #10b981;
+  color: #1f2937;
+}
+
+.icon-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.icon-value {
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 .detail-actions {
@@ -201,6 +276,11 @@
 
   .detail-list dd {
     color: #d1d5db;
+  }
+
+  .skill-icon.intellect,
+  .skill-icon.agility {
+    color: white;
   }
 
   .detail-actions {

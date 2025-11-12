@@ -3,17 +3,17 @@ import { DeckProvider } from './context/DeckContext';
 import { ChatProvider } from './context/ChatContext';
 import DeckBuilder from './components/DeckBuilder';
 import DeckSearch from './components/DeckSearch';
-import CardDetail from './components/CardDetail';
 import ChatWindow from './components/ChatWindow';
 import SimulationReport from './components/SimulationReport';
-import Button from './components/common/Button';
+import CardDetail from './components/CardDetail';
+import Modal from './components/common/Modal';
 import './App.css';
 
 function App() {
-  const [selectedCard, setSelectedCard] = useState(null);
   const [showSimulation, setShowSimulation] = useState(false);
   const [simulationData, setSimulationData] = useState(null);
-  const [activeView, setActiveView] = useState('builder'); // 'builder' or 'search'
+  const [searchPaneCollapsed, setSearchPaneCollapsed] = useState(false);
+  const [selectedCard, setSelectedCard] = useState(null);
 
   const handleOpenSimulation = (data) => {
     setSimulationData(data);
@@ -22,6 +22,14 @@ function App() {
 
   const handleCloseSimulation = () => {
     setShowSimulation(false);
+  };
+
+  const handleCardClick = (card) => {
+    setSelectedCard(card);
+  };
+
+  const handleCloseCardDetail = () => {
+    setSelectedCard(null);
   };
 
   return (
@@ -33,41 +41,24 @@ function App() {
               <h1>🃏 Arkham Assistant</h1>
               <p>AI-powered deckbuilding for Arkham Horror LCG</p>
             </div>
-            <div className="header-actions">
-              <Button
-                variant={activeView === 'builder' ? 'primary' : 'ghost'}
-                size="small"
-                onClick={() => setActiveView('builder')}
-              >
-                Deck Builder
-              </Button>
-              <Button
-                variant={activeView === 'search' ? 'primary' : 'ghost'}
-                size="small"
-                onClick={() => setActiveView('search')}
-              >
-                Card Search
-              </Button>
-            </div>
           </header>
 
           <main className="app-main">
             <div className="main-content">
-              {activeView === 'builder' ? (
-                <div className="pane deck-pane">
-                  <DeckBuilder />
-                </div>
-              ) : (
-                <div className="pane search-pane">
-                  <DeckSearch onCardSelect={setSelectedCard} />
-                </div>
-              )}
+              <div className={`pane search-pane ${searchPaneCollapsed ? 'collapsed' : ''}`}>
+                <button 
+                  className="collapse-toggle"
+                  onClick={() => setSearchPaneCollapsed(!searchPaneCollapsed)}
+                  aria-label={searchPaneCollapsed ? "Expand search" : "Collapse search"}
+                >
+                  {searchPaneCollapsed ? '›' : '‹'}
+                </button>
+                <DeckSearch collapsed={searchPaneCollapsed} onCardClick={handleCardClick} />
+              </div>
 
-              {selectedCard && activeView === 'search' && (
-                <div className="pane detail-pane">
-                  <CardDetail card={selectedCard} onClose={() => setSelectedCard(null)} />
-                </div>
-              )}
+              <div className="pane deck-pane">
+                <DeckBuilder onCardClick={handleCardClick} />
+              </div>
             </div>
 
             <div className="sidebar">
@@ -82,6 +73,15 @@ function App() {
             onClose={handleCloseSimulation}
             simulation={simulationData}
           />
+
+          <Modal
+            isOpen={!!selectedCard}
+            onClose={handleCloseCardDetail}
+            title={selectedCard?.name || selectedCard?.real_name || 'Card Details'}
+            size="large"
+          >
+            {selectedCard && <CardDetail card={selectedCard} />}
+          </Modal>
         </div>
       </ChatProvider>
     </DeckProvider>

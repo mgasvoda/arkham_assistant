@@ -5,7 +5,7 @@ import Card from './common/Card';
 import Button from './common/Button';
 import './DeckSearch.css';
 
-export default function DeckSearch({ onCardSelect }) {
+export default function DeckSearch({ collapsed, onCardClick }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     class: '',
@@ -15,6 +15,7 @@ export default function DeckSearch({ onCardSelect }) {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   
   const { addCard } = useDeck();
 
@@ -62,6 +63,21 @@ export default function DeckSearch({ onCardSelect }) {
     addCard(card, 1);
   };
 
+  const handleDragStart = (e, card) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/json', JSON.stringify(card));
+  };
+
+  if (collapsed) {
+    return (
+      <div className="deck-search collapsed">
+        <div className="search-collapsed-label">
+          <span>Card Search</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="deck-search">
       <div className="search-header">
@@ -77,54 +93,65 @@ export default function DeckSearch({ onCardSelect }) {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
 
-        <div className="filters">
-          <select
-            value={filters.class}
-            onChange={(e) => handleFilterChange('class', e.target.value)}
-            className="filter-select"
+        <div className="filters-section">
+          <button 
+            className="filters-toggle"
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
           >
-            <option value="">All Classes</option>
-            <option value="Guardian">Guardian</option>
-            <option value="Seeker">Seeker</option>
-            <option value="Rogue">Rogue</option>
-            <option value="Mystic">Mystic</option>
-            <option value="Survivor">Survivor</option>
-            <option value="Neutral">Neutral</option>
-          </select>
+            {filtersExpanded ? '▼' : '▶'} Filters
+          </button>
+          
+          {filtersExpanded && (
+            <div className="filters">
+              <select
+                value={filters.class}
+                onChange={(e) => handleFilterChange('class', e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Classes</option>
+                <option value="Guardian">Guardian</option>
+                <option value="Seeker">Seeker</option>
+                <option value="Rogue">Rogue</option>
+                <option value="Mystic">Mystic</option>
+                <option value="Survivor">Survivor</option>
+                <option value="Neutral">Neutral</option>
+              </select>
 
-          <select
-            value={filters.type}
-            onChange={(e) => handleFilterChange('type', e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Types</option>
-            <option value="Asset">Asset</option>
-            <option value="Event">Event</option>
-            <option value="Skill">Skill</option>
-            <option value="Treachery">Treachery</option>
-            <option value="Enemy">Enemy</option>
-          </select>
+              <select
+                value={filters.type}
+                onChange={(e) => handleFilterChange('type', e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All Types</option>
+                <option value="Asset">Asset</option>
+                <option value="Event">Event</option>
+                <option value="Skill">Skill</option>
+                <option value="Treachery">Treachery</option>
+                <option value="Enemy">Enemy</option>
+              </select>
 
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={filters.owned}
-              onChange={(e) => handleFilterChange('owned', e.target.checked)}
-            />
-            Owned Sets Only
-          </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={filters.owned}
+                  onChange={(e) => handleFilterChange('owned', e.target.checked)}
+                />
+                Owned Sets Only
+              </label>
 
-          <Button
-            variant="secondary"
-            size="small"
-            onClick={() => {
-              setSearchTerm('');
-              setFilters({ class: '', type: '', owned: false });
-              setCards([]);
-            }}
-          >
-            Clear
-          </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilters({ class: '', type: '', owned: false });
+                  setCards([]);
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -155,15 +182,50 @@ export default function DeckSearch({ onCardSelect }) {
         )}
 
         {!loading && !error && cards.length > 0 && (
-          <div className="card-grid">
+          <div className="card-list">
             {cards.map((card) => (
-              <Card
+              <div
                 key={card.code}
-                card={card}
-                onSelect={onCardSelect}
-                onAdd={handleAddCard}
-                showAddButton={true}
-              />
+                className={`search-result-item class-${(card.class_name || 'neutral').toLowerCase()}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, card)}
+              >
+                <div 
+                  className="result-info"
+                  onClick={() => onCardClick && onCardClick(card)}
+                  style={{ cursor: onCardClick ? 'pointer' : 'default' }}
+                >
+                  <div className="result-header">
+                    <span className="result-name">{card.name || card.real_name}</span>
+                    {card.cost !== undefined && card.cost !== null && (
+                      <span className="result-cost">{card.cost}</span>
+                    )}
+                  </div>
+                  <div className="result-meta">
+                    {card.type_name && (
+                      <span className="result-type">{card.type_name}</span>
+                    )}
+                    {card.class_name && (
+                      <span className={`result-class ${card.class_name.toLowerCase()}`}>
+                        {card.class_name}
+                      </span>
+                    )}
+                  </div>
+                  {card.traits && (
+                    <div className="result-traits">{card.traits}</div>
+                  )}
+                </div>
+                <button
+                  className="result-add-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddCard(card);
+                  }}
+                  title="Add to deck"
+                >
+                  +
+                </button>
+              </div>
             ))}
           </div>
         )}

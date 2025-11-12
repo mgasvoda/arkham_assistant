@@ -72,8 +72,12 @@
 }
 
 .modal-body {
-  padding: 1.5rem;
   overflow-y: auto;
+  flex: 1;
+}
+
+.modal-body > * {
+  height: 100%;
 }
 
 @media (prefers-color-scheme: dark) {

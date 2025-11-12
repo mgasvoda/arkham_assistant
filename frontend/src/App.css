@@ -49,14 +49,10 @@
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 350px 1fr;
   gap: 0;
   overflow: hidden;
   position: relative;
-}
-
-.main-content.with-detail {
-  grid-template-columns: 1fr 400px;
 }
 
 .sidebar {
@@ -76,6 +72,44 @@
 .deck-pane,
 .search-pane {
   height: 100%;
+}
+
+.search-pane {
+  position: relative;
+  border-right: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.search-pane.collapsed {
+  width: 48px;
+  min-width: 48px;
+  grid-column: auto;
+}
+
+.collapse-toggle {
+  position: absolute;
+  top: 1rem;
+  right: -16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #4f46e5;
+  color: white;
+  border: 2px solid white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.collapse-toggle:hover {
+  background: #4338ca;
+  transform: scale(1.1);
 }
 
 .detail-pane {
@@ -105,9 +139,15 @@
     max-height: 50vh;
   }
 
-  .main-content.with-detail {
+  .main-content {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: auto 1fr;
+  }
+  
+  .search-pane.collapsed {
+    width: 100%;
+    min-height: 48px;
+    height: 48px;
   }
 
   .detail-pane {
@@ -154,6 +194,19 @@
 
   .pane {
     background: #1f2937;
+  }
+
+  .search-pane {
+    border-right-color: #374151;
+  }
+
+  .collapse-toggle {
+    background: #6366f1;
+    border-color: #1f2937;
+  }
+
+  .collapse-toggle:hover {
+    background: #4f46e5;
   }
 
   .detail-pane {

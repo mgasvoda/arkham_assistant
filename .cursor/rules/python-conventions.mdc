@@ -11,6 +11,7 @@ alwaysApply: false
 - **ALWAYS** use `uv` for dependency management
 - Add dependencies with: `uv add <package>`
 - Update dependencies with: `uv sync`
+- Use `uv run` to execute any python files
 - Pin versions in `pyproject.toml` for reproducibility
 - Document major dependencies in relevant design docs
 

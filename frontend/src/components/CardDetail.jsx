@@ -20,16 +20,7 @@ export default function CardDetail({ card, onClose }) {
   };
 
   return (
-    <div className="card-detail">
-      <div className="detail-header">
-        <h2>{card.name || card.real_name}</h2>
-        {onClose && (
-          <button className="close-btn" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        )}
-      </div>
-
+    <div className={`card-detail class-${(card.class_name || 'neutral').toLowerCase()}`}>
       <div className="detail-content">
         <div className="detail-section">
           <div className="detail-meta">
@@ -43,6 +34,9 @@ export default function CardDetail({ card, onClose }) {
             )}
             {card.cost !== undefined && card.cost !== null && (
               <span className="meta-badge cost-badge">Cost: {card.cost}</span>
+            )}
+            {card.cost === null && (
+              <span className="meta-badge cost-badge">Cost: —</span>
             )}
           </div>
         </div>
@@ -68,8 +62,14 @@ export default function CardDetail({ card, onClose }) {
         )}
 
         <div className="detail-section">
-          <h3>Card Details</h3>
+          <h3>Card Information</h3>
           <dl className="detail-list">
+            {card.code && (
+              <>
+                <dt>Card Code</dt>
+                <dd>{card.code}</dd>
+              </>
+            )}
             {card.pack_name && (
               <>
                 <dt>Pack/Expansion</dt>
@@ -88,32 +88,43 @@ export default function CardDetail({ card, onClose }) {
                 <dd>{card.quantity}</dd>
               </>
             )}
-            {card.skill_willpower !== undefined && (
-              <>
-                <dt>Willpower</dt>
-                <dd>{card.skill_willpower || '-'}</dd>
-              </>
-            )}
-            {card.skill_intellect !== undefined && (
-              <>
-                <dt>Intellect</dt>
-                <dd>{card.skill_intellect || '-'}</dd>
-              </>
-            )}
-            {card.skill_combat !== undefined && (
-              <>
-                <dt>Combat</dt>
-                <dd>{card.skill_combat || '-'}</dd>
-              </>
-            )}
-            {card.skill_agility !== undefined && (
-              <>
-                <dt>Agility</dt>
-                <dd>{card.skill_agility || '-'}</dd>
-              </>
-            )}
           </dl>
         </div>
+
+        {(card.skill_willpower !== undefined || 
+          card.skill_intellect !== undefined || 
+          card.skill_combat !== undefined || 
+          card.skill_agility !== undefined) && (
+          <div className="detail-section">
+            <h3>Skill Icons</h3>
+            <div className="skill-icons">
+              {card.skill_willpower !== undefined && card.skill_willpower > 0 && (
+                <div className="skill-icon willpower">
+                  <span className="icon-label">Willpower</span>
+                  <span className="icon-value">×{card.skill_willpower}</span>
+                </div>
+              )}
+              {card.skill_intellect !== undefined && card.skill_intellect > 0 && (
+                <div className="skill-icon intellect">
+                  <span className="icon-label">Intellect</span>
+                  <span className="icon-value">×{card.skill_intellect}</span>
+                </div>
+              )}
+              {card.skill_combat !== undefined && card.skill_combat > 0 && (
+                <div className="skill-icon combat">
+                  <span className="icon-label">Combat</span>
+                  <span className="icon-value">×{card.skill_combat}</span>
+                </div>
+              )}
+              {card.skill_agility !== undefined && card.skill_agility > 0 && (
+                <div className="skill-icon agility">
+                  <span className="icon-label">Agility</span>
+                  <span className="icon-value">×{card.skill_agility}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {card.restrictions && (
           <div className="detail-section">
