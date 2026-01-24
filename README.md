@@ -15,19 +15,36 @@ A local hobby project to assist with *Arkham Horror: The Card Game* deckbuilding
 - **Backend**: Python 3.11+ with FastAPI
 - **Frontend**: React 18 + Vite
 - **Database**: ChromaDB
-- **LLM**: OpenAI GPT-5 or local model
+- **LLM Orchestration**: LangGraph with OpenAI
 
 ## Quick Start
+
+### Environment Setup
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and add your OpenAI API key:
+   ```
+   OPENAI_API_KEY=sk-your-actual-key
+   ```
+
+3. (Optional) Configure model selection:
+   ```
+   ORCHESTRATOR_MODEL=gpt-4o      # Primary reasoning model
+   SUBAGENT_MODEL=gpt-4o-mini     # Faster model for simple tasks
+   ```
 
 ### Backend Setup
 
 ```bash
 # Install dependencies with uv
-cd backend
 uv sync
 
 # Run development server
-uv run uvicorn main:app --reload
+uv run uvicorn backend.main:app --reload
 ```
 
 ### Frontend Setup
@@ -48,6 +65,18 @@ npm run dev
 cd scripts
 uv run python fetch_arkhamdb.py --full
 ```
+
+## LLM Configuration
+
+The assistant uses LangGraph with OpenAI models. Configuration is managed through environment variables:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | Yes | - | Your OpenAI API key |
+| `ORCHESTRATOR_MODEL` | No | `gpt-4o` | Model for complex reasoning (e.g., `o3`, `o4-mini`) |
+| `SUBAGENT_MODEL` | No | `gpt-4o-mini` | Model for simple tasks (e.g., `gpt-5-mini`) |
+
+The LLM configuration is centralized in `backend/services/llm_config.py`.
 
 ## Development
 
