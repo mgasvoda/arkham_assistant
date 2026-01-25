@@ -1,0 +1,646 @@
+{
+  "campaign": {
+    "id": "dunwich",
+    "name": "The Dunwich Legacy",
+    "description": "The first full campaign expansion. Features the investigators from Miskatonic University investigating strange occurrences in Dunwich.",
+    "scenarios": ["extracurricular_activity", "the_house_always_wins", "the_miskatonic_museum", "the_essex_county_express", "blood_on_the_altar", "undimensioned_and_unseen", "where_doom_awaits", "lost_in_time_and_space"]
+  },
+  "scenarios": [
+    {
+      "id": "extracurricular_activity",
+      "name": "Extracurricular Activity",
+      "campaign": "The Dunwich Legacy",
+      "position": 1,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "medium",
+      "treachery_profile": {
+        "willpower": 4,
+        "agility": 3,
+        "combat": 2,
+        "intellect": 2
+      },
+      "key_tests": ["willpower", "agility", "intellect"],
+      "mechanics": ["aloof", "keywards", "experiment_enemies"],
+      "enemies": [
+        {
+          "name": "The Experiment",
+          "type": "elite",
+          "fight": 2,
+          "health": 6,
+          "evade": 5,
+          "damage": 2,
+          "horror": 1,
+          "notes": "Boss. Massive. Grows stronger each round. Time-sensitive threat."
+        },
+        {
+          "name": "Thrall",
+          "type": "basic",
+          "fight": 2,
+          "health": 2,
+          "evade": 2,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Common enemy. Basic threat level."
+        },
+        {
+          "name": "Wizard of Yog-Sothoth",
+          "type": "elite",
+          "fight": 4,
+          "health": 4,
+          "evade": 2,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Aloof. Doom ability. High priority target."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Pushed into the Beyond",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "discard",
+          "notes": "Discard ally or asset."
+        },
+        {
+          "name": "Arcane Barrier",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "movement_restriction",
+          "notes": "Attach to location. Tests to leave."
+        },
+        {
+          "name": "Terror from Beyond",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "horror",
+          "notes": "Horror damage on failure."
+        }
+      ],
+      "tips": [
+        "Can be played in either order with House Always Wins",
+        "The Experiment escalates quickly - don't dawdle",
+        "Agility tests are more common here than in Night of the Zealot",
+        "Keys are important - keep track of who has them",
+        "The dormitories provide good early clues",
+        "Consider splitting up to cover more ground",
+        "Willpower remains important for treacheries"
+      ],
+      "difficulty_notes": "Introductory Dunwich scenario. Time pressure from The Experiment."
+    },
+    {
+      "id": "the_house_always_wins",
+      "name": "The House Always Wins",
+      "campaign": "The Dunwich Legacy",
+      "position": 1,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "low",
+      "treachery_profile": {
+        "willpower": 2,
+        "agility": 3,
+        "combat": 2,
+        "intellect": 3
+      },
+      "key_tests": ["agility", "intellect", "willpower"],
+      "mechanics": ["cheating", "gambling", "clover_club"],
+      "enemies": [
+        {
+          "name": "Clover Club Pit Boss",
+          "type": "elite",
+          "fight": 4,
+          "health": 5,
+          "evade": 2,
+          "damage": 2,
+          "horror": 0,
+          "notes": "Boss enemy. Aloof until triggered."
+        },
+        {
+          "name": "Mobster",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 3,
+          "damage": 1,
+          "horror": 0,
+          "notes": "Hunter. Common enemy."
+        },
+        {
+          "name": "O'Bannion's Thug",
+          "type": "basic",
+          "fight": 4,
+          "health": 4,
+          "evade": 3,
+          "damage": 2,
+          "horror": 0,
+          "notes": "Stronger mobster variant."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Something in the Drinks",
+          "test": "agility",
+          "difficulty": 3,
+          "effect": "damage",
+          "notes": "Physical damage on failure."
+        },
+        {
+          "name": "Arousing Suspicions",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "enemy_spawn",
+          "notes": "Spawns enemies."
+        }
+      ],
+      "tips": [
+        "This scenario rewards careful play over combat",
+        "Agility and evasion are more valuable than combat",
+        "Intellect helps with gambling and investigation",
+        "Can avoid many fights through stealth approach",
+        "Rogue cards synergize well with scenario mechanics",
+        "Consider bringing resources for 'cheating' options",
+        "Less horror than other scenarios - combat damage more common"
+      ],
+      "difficulty_notes": "Alternative intro scenario. Rewards stealth and social skills over combat."
+    },
+    {
+      "id": "the_miskatonic_museum",
+      "name": "The Miskatonic Museum",
+      "campaign": "The Dunwich Legacy",
+      "position": 2,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "low",
+      "treachery_profile": {
+        "willpower": 4,
+        "agility": 4,
+        "combat": 1,
+        "intellect": 2
+      },
+      "key_tests": ["agility", "willpower", "intellect"],
+      "mechanics": ["hunting_horror", "restricted_halls", "darkness"],
+      "enemies": [
+        {
+          "name": "Hunting Horror",
+          "type": "elite",
+          "fight": 3,
+          "health": 6,
+          "evade": 2,
+          "damage": 2,
+          "horror": 1,
+          "notes": "The Hunter. Returns when defeated. Cannot be permanently killed."
+        },
+        {
+          "name": "Shadow Spawn",
+          "type": "basic",
+          "fight": 2,
+          "health": 2,
+          "evade": 3,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Darkness-themed enemy."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Ephemeral Exhibits",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "horror",
+          "notes": "Horror on failure. Common."
+        },
+        {
+          "name": "Slithering Behind You",
+          "test": "agility",
+          "difficulty": 4,
+          "effect": "damage",
+          "notes": "Hunted by the Hunting Horror."
+        },
+        {
+          "name": "Passage into the Veil",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "location_change",
+          "notes": "Forced movement effect."
+        }
+      ],
+      "tips": [
+        "The Hunting Horror CANNOT be killed permanently",
+        "Evasion is essential - invest in agility",
+        "Move efficiently - the Horror follows you",
+        "Restricted halls require planning",
+        "Willpower treacheries are frequent and brutal",
+        "Consider bringing flashlight effects",
+        "Horror soak helps survive the chase",
+        "Don't waste ammo on the Hunting Horror"
+      ],
+      "difficulty_notes": "Chase scenario. The Hunting Horror is relentless. Evasion-focused."
+    },
+    {
+      "id": "the_essex_county_express",
+      "name": "The Essex County Express",
+      "campaign": "The Dunwich Legacy",
+      "position": 3,
+      "act_count": 4,
+      "agenda_count": 5,
+      "enemy_density": "medium",
+      "treachery_profile": {
+        "willpower": 3,
+        "agility": 4,
+        "combat": 2,
+        "intellect": 2
+      },
+      "key_tests": ["agility", "willpower", "combat"],
+      "mechanics": ["train_cars", "car_destruction", "time_pressure"],
+      "enemies": [
+        {
+          "name": "Emergent Monstrosity",
+          "type": "elite",
+          "fight": 4,
+          "health": 8,
+          "evade": 3,
+          "damage": 2,
+          "horror": 2,
+          "notes": "Large boss. Appears partway through."
+        },
+        {
+          "name": "Grappling Horror",
+          "type": "basic",
+          "fight": 3,
+          "health": 4,
+          "evade": 2,
+          "damage": 2,
+          "horror": 1,
+          "notes": "Grabs investigators. Restricts movement."
+        },
+        {
+          "name": "Clinging Mist",
+          "type": "basic",
+          "fight": 2,
+          "health": 3,
+          "evade": 4,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Hard to hit. Slippery."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Across Space",
+          "test": "agility",
+          "difficulty": 3,
+          "effect": "damage",
+          "notes": "Between cars hazard."
+        },
+        {
+          "name": "Across Time",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "doom",
+          "notes": "Time acceleration."
+        },
+        {
+          "name": "Claws of Steam",
+          "test": "agility",
+          "difficulty": 4,
+          "effect": "damage",
+          "notes": "Environmental hazard."
+        }
+      ],
+      "tips": [
+        "Train cars can be destroyed - keep moving forward",
+        "Time pressure is real - agenda advances quickly",
+        "Agility is the most tested stat in this scenario",
+        "Cards that provide extra actions are excellent",
+        "Movement is crucial - don't get trapped in rear cars",
+        "Combat happens but evasion often preferred",
+        "The scenario rewards aggressive forward progress",
+        "Leo De Luca/Haste effects very valuable"
+      ],
+      "difficulty_notes": "Linear, time-pressure scenario on a train. Very unique mechanics."
+    },
+    {
+      "id": "blood_on_the_altar",
+      "name": "Blood on the Altar",
+      "campaign": "The Dunwich Legacy",
+      "position": 4,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "high",
+      "treachery_profile": {
+        "willpower": 4,
+        "agility": 2,
+        "combat": 3,
+        "intellect": 2
+      },
+      "key_tests": ["willpower", "combat", "intellect"],
+      "mechanics": ["kidnapping", "hidden_locations", "villager_sacrifice"],
+      "enemies": [
+        {
+          "name": "Silas Bishop",
+          "type": "elite",
+          "fight": 4,
+          "health": 7,
+          "evade": 3,
+          "damage": 2,
+          "horror": 2,
+          "notes": "Main antagonist. Cult leader."
+        },
+        {
+          "name": "Servant of Many Mouths",
+          "type": "basic",
+          "fight": 3,
+          "health": 4,
+          "evade": 3,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Disturbing cultist. Horror damage."
+        },
+        {
+          "name": "Conglomeration of Spheres",
+          "type": "elite",
+          "fight": 1,
+          "health": 5,
+          "evade": 5,
+          "damage": 1,
+          "horror": 3,
+          "notes": "Bizarre entity. Horror focused."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Kidnapped!",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "ally_capture",
+          "notes": "Captures allies. Campaign critical."
+        },
+        {
+          "name": "Psychopomp's Song",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "horror",
+          "notes": "Severe horror damage."
+        },
+        {
+          "name": "Strange Signs",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "doom",
+          "notes": "Adds doom. Time pressure."
+        }
+      ],
+      "tips": [
+        "CRITICAL: Allies can be permanently lost here",
+        "Search locations thoroughly to find captured villagers",
+        "Horror protection is essential",
+        "Combat necessary for the cultist enemies",
+        "Willpower tests are frequent and high-stakes",
+        "Key locations may be hidden - investigate carefully",
+        "Consider which allies you can afford to lose",
+        "This scenario has major campaign consequences"
+      ],
+      "difficulty_notes": "High-stakes scenario with permanent consequences. Horror-heavy."
+    },
+    {
+      "id": "undimensioned_and_unseen",
+      "name": "Undimensioned and Unseen",
+      "campaign": "The Dunwich Legacy",
+      "position": 5,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "high",
+      "treachery_profile": {
+        "willpower": 5,
+        "agility": 2,
+        "combat": 4,
+        "intellect": 2
+      },
+      "key_tests": ["willpower", "combat"],
+      "mechanics": ["brood", "esoteric_formula", "invisible_enemies"],
+      "enemies": [
+        {
+          "name": "Brood of Yog-Sothoth",
+          "type": "elite",
+          "fight": 6,
+          "health": 4,
+          "evade": 4,
+          "damage": 2,
+          "horror": 2,
+          "notes": "Multiple appear. Require special weapons to damage."
+        },
+        {
+          "name": "Whippoorwill",
+          "type": "basic",
+          "fight": 1,
+          "health": 1,
+          "evade": 4,
+          "damage": 0,
+          "horror": 0,
+          "notes": "Aloof. Reduces willpower. Kill on sight."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Ruin and Destruction",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "damage_horror",
+          "notes": "Both damage and horror."
+        },
+        {
+          "name": "Altered Beast",
+          "test": "combat",
+          "difficulty": 5,
+          "effect": "heal_enemy",
+          "notes": "Broods heal if fail."
+        },
+        {
+          "name": "Towering Beasts",
+          "test": "willpower",
+          "difficulty": 5,
+          "effect": "horror",
+          "notes": "Very high difficulty."
+        }
+      ],
+      "tips": [
+        "CRITICAL: Need Esoteric Formula to hurt the Broods",
+        "The Broods CANNOT be hurt by normal weapons",
+        "Willpower is tested at brutal difficulty (4-5)",
+        "Kill Whippoorwills immediately - they stack willpower penalty",
+        "Combat stat must be high for Brood fights",
+        "This is one of the hardest scenarios in Dunwich",
+        "Horror damage is constant - bring soak",
+        "Consider cards that boost willpower significantly",
+        "Powder of Ibn-Ghazi helps identify invisible threats"
+      ],
+      "difficulty_notes": "Brutal combat scenario. Requires specific tools. Very challenging."
+    },
+    {
+      "id": "where_doom_awaits",
+      "name": "Where Doom Awaits",
+      "campaign": "The Dunwich Legacy",
+      "position": 6,
+      "act_count": 3,
+      "agenda_count": 4,
+      "enemy_density": "high",
+      "treachery_profile": {
+        "willpower": 6,
+        "agility": 3,
+        "combat": 3,
+        "intellect": 1
+      },
+      "key_tests": ["willpower", "combat", "agility"],
+      "mechanics": ["ascending", "altered_locations", "reality_warp"],
+      "enemies": [
+        {
+          "name": "Seth Bishop",
+          "type": "elite",
+          "fight": 4,
+          "health": 5,
+          "evade": 2,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Sorcerer enemy. Doom manipulation."
+        },
+        {
+          "name": "Devoted",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 3,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Cultist enemy type."
+        },
+        {
+          "name": "Avian Thrall",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 4,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Flying enemy. High evasion."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Beyond the Veil",
+          "test": "willpower",
+          "difficulty": 5,
+          "effect": "defeat",
+          "notes": "Can defeat investigator with empty deck. Very dangerous."
+        },
+        {
+          "name": "Visions of Futures Past",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "discard",
+          "notes": "Discards cards from deck."
+        },
+        {
+          "name": "Sordid and Silent",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "silence",
+          "notes": "Cannot play events."
+        }
+      ],
+      "tips": [
+        "WARNING: Beyond the Veil can defeat you outright",
+        "Don't let your deck run out - it's lethal",
+        "Card draw effects are risky here",
+        "Willpower tests are extremely punishing",
+        "Ascending the mountain is the primary goal",
+        "Combat is necessary but secondary to progress",
+        "High willpower absolutely essential",
+        "Consider cards that shuffle discard back into deck"
+      ],
+      "difficulty_notes": "Penultimate scenario. Very high willpower requirements. Unique defeat condition."
+    },
+    {
+      "id": "lost_in_time_and_space",
+      "name": "Lost in Time and Space",
+      "campaign": "The Dunwich Legacy",
+      "position": 7,
+      "act_count": 4,
+      "agenda_count": 3,
+      "enemy_density": "high",
+      "treachery_profile": {
+        "willpower": 6,
+        "agility": 3,
+        "combat": 4,
+        "intellect": 4
+      },
+      "key_tests": ["willpower", "intellect", "combat"],
+      "mechanics": ["extradimensional", "random_locations", "yog_sothoth"],
+      "enemies": [
+        {
+          "name": "Yog-Sothoth",
+          "type": "ancient_one",
+          "fight": 6,
+          "health": 0,
+          "evade": 0,
+          "damage": 4,
+          "horror": 4,
+          "notes": "Final boss. Special rules. See scenario guide."
+        },
+        {
+          "name": "Interstellar Traveler",
+          "type": "basic",
+          "fight": 4,
+          "health": 3,
+          "evade": 4,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Dimension-hopping enemy."
+        },
+        {
+          "name": "Yithian Starseeker",
+          "type": "basic",
+          "fight": 3,
+          "health": 4,
+          "evade": 3,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Intellect debuff on engaged."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Vast Expanse",
+          "test": "willpower",
+          "difficulty": 5,
+          "effect": "location_change",
+          "notes": "Random relocation."
+        },
+        {
+          "name": "Wormhole",
+          "test": "intellect",
+          "difficulty": 4,
+          "effect": "location_change",
+          "notes": "Forced dimension shift."
+        },
+        {
+          "name": "Collapsing Reality",
+          "test": "willpower",
+          "difficulty": 5,
+          "effect": "damage_horror",
+          "notes": "Reality breakdown."
+        }
+      ],
+      "tips": [
+        "Campaign finale - bring your best deck",
+        "Locations are chaotic - embrace randomness",
+        "Willpower and intellect both critical",
+        "Yog-Sothoth has special defeat rules",
+        "Combat is brutal in the outer realms",
+        "Horror is constant - maximum soak needed",
+        "Consider all possible endings when choosing approach",
+        "Movement effects less useful due to location mechanics"
+      ],
+      "difficulty_notes": "Campaign finale. Highly chaotic. Multiple endings possible."
+    }
+  ]
+}

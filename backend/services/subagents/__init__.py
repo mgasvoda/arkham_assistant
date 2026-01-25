@@ -32,15 +32,6 @@ from backend.services.subagents.base import (
     # Factory function
     create_subagent,
 )
-from backend.services.subagents.cache import (
-    # Caching layer
-    CacheConfig,
-    CacheEntry,
-    CacheMetrics,
-    SubagentCache,
-    get_subagent_cache,
-    reset_subagent_cache,
-)
 from backend.services.subagents.rules_agent import (
     # Enhanced RulesAgent with hybrid retrieval
     RulesAgent,
@@ -48,6 +39,23 @@ from backend.services.subagents.rules_agent import (
     RulesResponse,
     RulesRetriever,
     create_rules_agent,
+)
+from backend.services.subagents.scenario_agent import (
+    Priority,
+    # ScenarioAgent with scenario data integration
+    ScenarioAgent,
+    ScenarioQuery,
+    ScenarioResponse,
+    ThreatProfile,
+    create_scenario_agent,
+)
+from backend.services.subagents.state_agent import (
+    # StateAgent for deck composition analysis
+    StateAgent,
+    StateQuery,
+    StateResponse,
+    SynergyInfo,
+    create_state_agent,
 )
 
 __all__ = [
@@ -79,6 +87,19 @@ __all__ = [
     "SubagentCache",
     "get_subagent_cache",
     "reset_subagent_cache",
+    # ScenarioAgent (full implementation)
+    "ScenarioAgent",
+    "ScenarioQuery",
+    "ScenarioResponse",
+    "ThreatProfile",
+    "Priority",
+    "create_scenario_agent",
+    # StateAgent (full implementation)
+    "StateAgent",
+    "StateQuery",
+    "StateResponse",
+    "SynergyInfo",
+    "create_state_agent",
     # Factory functions
     "create_subagent",
     "create_rules_agent",
