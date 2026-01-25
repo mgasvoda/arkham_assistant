@@ -11,20 +11,6 @@ Subagent Types:
 - scenario: Scenario threats and preparation
 """
 
-from backend.services.subagents.base import (
-    # Base classes and exceptions
-    BaseSubagent,
-    SubagentConfig,
-    SubagentError,
-    SubagentTimeoutError,
-    # Basic implementations
-    RulesSubagent,
-    StateSubagent,
-    ActionSpaceSubagent,
-    ScenarioSubagent,
-    # Factory function
-    create_subagent,
-)
 from backend.services.subagents.action_space_agent import (
     ActionSpaceAgent,
     ActionSpaceQuery,
@@ -32,7 +18,20 @@ from backend.services.subagents.action_space_agent import (
     CardCandidate,
     create_action_space_agent,
 )
-
+from backend.services.subagents.base import (
+    ActionSpaceSubagent,
+    # Base classes and exceptions
+    BaseSubagent,
+    # Basic implementations
+    RulesSubagent,
+    ScenarioSubagent,
+    StateSubagent,
+    SubagentConfig,
+    SubagentError,
+    SubagentTimeoutError,
+    # Factory function
+    create_subagent,
+)
 from backend.services.subagents.rules_agent import (
     # Enhanced RulesAgent with hybrid retrieval
     RulesAgent,
@@ -40,6 +39,15 @@ from backend.services.subagents.rules_agent import (
     RulesResponse,
     RulesRetriever,
     create_rules_agent,
+)
+from backend.services.subagents.scenario_agent import (
+    Priority,
+    # ScenarioAgent with scenario data integration
+    ScenarioAgent,
+    ScenarioQuery,
+    ScenarioResponse,
+    ThreatProfile,
+    create_scenario_agent,
 )
 
 __all__ = [
@@ -64,6 +72,13 @@ __all__ = [
     "RulesQuery",
     "RulesResponse",
     "RulesRetriever",
+    # ScenarioAgent (full implementation)
+    "ScenarioAgent",
+    "ScenarioQuery",
+    "ScenarioResponse",
+    "ThreatProfile",
+    "Priority",
+    "create_scenario_agent",
     # Factory functions
     "create_subagent",
     "create_rules_agent",
