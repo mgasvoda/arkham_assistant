@@ -30,12 +30,15 @@ def temp_chroma_db(tmp_path):
 
     # Inject the client into agent_tools module
     original_client = agent_tools._chroma_client
+    original_loader = agent_tools._card_loader
     agent_tools._chroma_client = client
+    agent_tools._card_loader = None  # Reset so it uses new client
 
     yield client
 
-    # Restore original client
+    # Restore original client and loader
     agent_tools._chroma_client = original_client
+    agent_tools._card_loader = original_loader
 
 
 @pytest.fixture
@@ -279,7 +282,8 @@ class TestGetStaticInfoIntegration:
         """Should read actual meta_trends.md file."""
         result = get_static_info("meta")
 
-        assert "Meta Trends" in result
+        # File contains strategic doctrine for deckbuilding
+        assert "Strategic Doctrine" in result or "Deckbuilding" in result
         assert "Guardian" in result
         assert "Seeker" in result
 

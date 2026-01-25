@@ -11,7 +11,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from backend.models.subagent_models import SubagentMetadata, SubagentResponse
-from backend.services.agent_tools import get_deck
 from backend.services.chroma_client import ChromaClient
 from backend.services.subagents.utils import CardDataLoader
 
@@ -366,6 +365,9 @@ class StateAgent:
 
         if query.deck_id:
             # Load from stored deck
+            # Import locally to avoid circular import
+            from backend.services.agent_tools import get_deck
+
             try:
                 deck = get_deck(query.deck_id)
                 deck_name = deck.get("name")

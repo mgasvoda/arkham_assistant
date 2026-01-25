@@ -238,7 +238,7 @@ class TestSubagentErrorHandling:
         mock_llm.invoke.side_effect = Exception("Rate limit exceeded")
         mock_chat_openai.return_value = mock_llm
 
-        agent = RulesSubagent(config=SubagentConfig(retry_attempts=0))
+        agent = RulesSubagent(config=SubagentConfig(retry_attempts=0), use_cache=False)
         response = agent.query("Test query")
 
         assert isinstance(response, SubagentResponse)
@@ -256,7 +256,7 @@ class TestSubagentErrorHandling:
         ]
         mock_chat_openai.return_value = mock_llm
 
-        agent = RulesSubagent(config=SubagentConfig(retry_attempts=1))
+        agent = RulesSubagent(config=SubagentConfig(retry_attempts=1), use_cache=False)
         response = agent.query("Test query")
 
         assert "Success after retry" in response.content
@@ -268,7 +268,7 @@ class TestSubagentErrorHandling:
         mock_llm.invoke.side_effect = Exception("Persistent error")
         mock_chat_openai.return_value = mock_llm
 
-        agent = RulesSubagent(config=SubagentConfig(retry_attempts=2))
+        agent = RulesSubagent(config=SubagentConfig(retry_attempts=2), use_cache=False)
         response = agent.query("Test query")
 
         assert response.confidence == 0.0

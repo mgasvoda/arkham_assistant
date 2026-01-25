@@ -720,7 +720,7 @@ class TestStateAgentAnalyze:
             "text": "Fight action",
         }
 
-        with patch("backend.services.subagents.state_agent.get_deck", return_value=mock_deck):
+        with patch("backend.services.agent_tools.get_deck", return_value=mock_deck):
             state_agent._client.get_card.return_value = mock_card
 
             query = StateQuery(deck_id="deck_123", investigator_id="01001")
@@ -756,7 +756,7 @@ class TestStateAgentAnalyze:
             "cards": "[]",
         }
 
-        with patch("backend.services.subagents.state_agent.get_deck", return_value=mock_deck):
+        with patch("backend.services.agent_tools.get_deck", return_value=mock_deck):
             query = StateQuery(deck_id="deck_empty", investigator_id="01001")
             response = state_agent.analyze(query)
 

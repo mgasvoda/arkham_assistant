@@ -363,14 +363,16 @@ Structure your response as follows:
         self,
         config: SubagentConfig | None = None,
         retriever: RulesRetriever | None = None,
+        use_cache: bool = True,
     ) -> None:
         """Initialize the RulesAgent.
 
         Args:
             config: Optional configuration for the subagent.
             retriever: Optional custom retriever. If None, creates default.
+            use_cache: Whether to use response caching (default: True).
         """
-        super().__init__(agent_type="rules", config=config)
+        super().__init__(agent_type="rules", config=config, use_cache=use_cache)
         self.retriever = retriever or RulesRetriever()
 
     def _prepare_prompt_node(self, state: SubagentState) -> dict[str, Any]:

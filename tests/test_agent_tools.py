@@ -44,11 +44,13 @@ from backend.services.agent_tools import (
 @pytest.fixture
 def mock_chroma_client():
     """Create a mock ChromaDB client."""
+    # Reset both module-level singletons to ensure fresh mock injection
     with patch("backend.services.agent_tools._chroma_client", None):
-        with patch("backend.services.agent_tools.ChromaClient") as MockClient:
-            mock_client = MagicMock()
-            MockClient.return_value = mock_client
-            yield mock_client
+        with patch("backend.services.agent_tools._card_loader", None):
+            with patch("backend.services.agent_tools.ChromaClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+                yield mock_client
 
 
 @pytest.fixture
@@ -223,8 +225,9 @@ class TestGetStaticInfo:
         """Should return content of meta_trends.md."""
         result = get_static_info("meta")
 
-        assert "Meta Trends" in result
-        assert "Archetypes" in result
+        # File contains strategic doctrine for deckbuilding
+        assert "Strategic Doctrine" in result or "Deckbuilding" in result
+        assert "Guardian" in result  # Class doctrine sections
 
     def test_returns_owned_sets_content(self):
         """Should return content of owned_sets.md."""
@@ -250,7 +253,8 @@ class TestGetStaticInfo:
         result = get_static_info("investigator:roland")
 
         # Currently returns meta_trends.md for investigator topics
-        assert "Meta Trends" in result or "Archetypes" in result
+        # File contains strategic doctrine including class information
+        assert "Guardian" in result or "Seeker" in result
 
     def test_raises_error_for_unknown_topic(self):
         """Should raise error for unknown topic."""

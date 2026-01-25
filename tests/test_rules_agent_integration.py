@@ -143,7 +143,7 @@ class TestRulesAgentIntegration:
         mock_llm.invoke.return_value = mock_llm_response
         mock_chat_class.return_value = mock_llm
 
-        agent = RulesAgent(retriever=actual_retriever)
+        agent = RulesAgent(retriever=actual_retriever, use_cache=False)
         agent.query("deck construction rules")
 
         # Check that the system prompt includes retrieved content

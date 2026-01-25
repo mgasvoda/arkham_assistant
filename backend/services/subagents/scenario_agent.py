@@ -249,14 +249,16 @@ Provide your analysis with:
         self,
         config: SubagentConfig | None = None,
         scenario_loader: ScenarioLoader | None = None,
+        use_cache: bool = True,
     ) -> None:
         """Initialize the ScenarioAgent.
 
         Args:
             config: Optional configuration for the subagent.
             scenario_loader: Optional custom scenario loader.
+            use_cache: Whether to use response caching (default: True).
         """
-        super().__init__(agent_type="scenario", config=config)
+        super().__init__(agent_type="scenario", config=config, use_cache=use_cache)
         self.scenario_loader = scenario_loader or get_scenario_loader()
 
     def _prepare_prompt_node(self, state: SubagentState) -> dict[str, Any]:
