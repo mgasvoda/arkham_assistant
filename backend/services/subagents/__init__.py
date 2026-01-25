@@ -80,6 +80,13 @@ __all__ = [
     "RulesQuery",
     "RulesResponse",
     "RulesRetriever",
+    # Caching layer
+    "CacheConfig",
+    "CacheEntry",
+    "CacheMetrics",
+    "SubagentCache",
+    "get_subagent_cache",
+    "reset_subagent_cache",
     # ScenarioAgent (full implementation)
     "ScenarioAgent",
     "ScenarioQuery",
