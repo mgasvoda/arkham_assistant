@@ -49,6 +49,14 @@ from backend.services.subagents.scenario_agent import (
     ThreatProfile,
     create_scenario_agent,
 )
+from backend.services.subagents.state_agent import (
+    # StateAgent for deck composition analysis
+    StateAgent,
+    StateQuery,
+    StateResponse,
+    SynergyInfo,
+    create_state_agent,
+)
 
 __all__ = [
     # Base classes and exceptions
@@ -79,6 +87,12 @@ __all__ = [
     "ThreatProfile",
     "Priority",
     "create_scenario_agent",
+    # StateAgent (full implementation)
+    "StateAgent",
+    "StateQuery",
+    "StateResponse",
+    "SynergyInfo",
+    "create_state_agent",
     # Factory functions
     "create_subagent",
     "create_rules_agent",
