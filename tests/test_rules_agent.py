@@ -112,9 +112,10 @@ class TestRulesResponse:
 
     def test_error_response(self):
         """Should create error response."""
-        response = RulesResponse.error_response("Something went wrong")
+        response = RulesResponse.error_response("Something went wrong", "rules")
         assert response.content == "Something went wrong"
         assert response.confidence == 0.0
+        assert response.metadata.agent_type == "rules"
         assert response.metadata.query_type == "error"
         assert response.metadata.extra.get("error") is True
         assert response.rule_text == ""

@@ -27,6 +27,11 @@ from backend.services.subagents.base import (
     SubagentConfig,
     SubagentState,
 )
+from backend.services.subagents.utils import (
+    classify_query_by_keywords,
+    compute_bounded_confidence,
+    contains_any_phrase,
+)
 
 # =============================================================================
 # Input/Output Schemas
@@ -132,68 +137,14 @@ class ScenarioResponse(SubagentResponse):
     )
 
     @classmethod
-    def from_base_response(
-        cls,
-        base_response: SubagentResponse,
-        scenario_name: str = "",
-        threat_profile: ThreatProfile | None = None,
-        preparation_priorities: list[Priority] | None = None,
-        recommended_capabilities: list[str] | None = None,
-    ) -> "ScenarioResponse":
-        """Create a ScenarioResponse from a base SubagentResponse.
-
-        Args:
-            base_response: The base response to extend.
-            scenario_name: Name of the scenario.
-            threat_profile: Threat profile data.
-            preparation_priorities: List of priorities.
-            recommended_capabilities: List of capabilities.
-
-        Returns:
-            ScenarioResponse with all fields populated.
-        """
-        return cls(
-            content=base_response.content,
-            confidence=base_response.confidence,
-            sources=base_response.sources,
-            metadata=base_response.metadata,
-            scenario_name=scenario_name,
-            threat_profile=threat_profile,
-            preparation_priorities=preparation_priorities or [],
-            recommended_capabilities=recommended_capabilities or [],
-        )
-
-    @classmethod
-    def error_response(
-        cls,
-        error_message: str,
-        agent_type: str = "scenario",
-        confidence: float = 0.0,
-    ) -> "ScenarioResponse":
-        """Create an error response for graceful degradation.
-
-        Args:
-            error_message: Description of the error.
-            agent_type: The agent type (default: "scenario").
-            confidence: Confidence score (typically 0 for errors).
-
-        Returns:
-            A ScenarioResponse indicating an error occurred.
-        """
-        return cls(
-            content=error_message,
-            confidence=confidence,
-            sources=[],
-            metadata=SubagentMetadata(
-                agent_type=agent_type,
-                query_type="error",
-                extra={"error": True},
-            ),
-            scenario_name="",
-            threat_profile=None,
-            preparation_priorities=[],
-            recommended_capabilities=[],
-        )
+    def _get_error_defaults(cls) -> dict[str, Any]:
+        """Provide default values for scenario-specific fields in error responses."""
+        return {
+            "scenario_name": "",
+            "threat_profile": None,
+            "preparation_priorities": [],
+            "recommended_capabilities": [],
+        }
 
     @classmethod
     def unknown_scenario_response(
@@ -203,6 +154,9 @@ class ScenarioResponse(SubagentResponse):
     ) -> "ScenarioResponse":
         """Create a response for unknown scenarios.
 
+        This is a domain-specific error type that indicates the scenario
+        was not found but provides helpful guidance.
+
         Args:
             scenario_query: The scenario that was queried.
             agent_type: The agent type.
@@ -210,6 +164,7 @@ class ScenarioResponse(SubagentResponse):
         Returns:
             A ScenarioResponse indicating scenario was not found.
         """
+        defaults = cls._get_error_defaults()
         return cls(
             content=(
                 f"Scenario '{scenario_query}' was not found in the database. "
@@ -223,10 +178,7 @@ class ScenarioResponse(SubagentResponse):
                 query_type="unknown_scenario",
                 extra={"scenario_query": scenario_query},
             ),
-            scenario_name="",
-            threat_profile=None,
-            preparation_priorities=[],
-            recommended_capabilities=[],
+            **defaults,
         )
 
 
@@ -722,6 +674,11 @@ Provide your analysis with:
 
         return "\n".join(f"- {tip}" for tip in scenario.tips)
 
+    # Confidence adjustment phrases
+    SPECIFIC_CONTENT_PHRASES = ["key threat", "priority", "recommend", "prepare"]
+    SKILL_PHRASES = ["willpower", "agility", "combat", "intellect"]
+    UNCERTAINTY_PHRASES = ["not sure", "unclear", "might", "possibly"]
+
     def _calculate_confidence(
         self, content: str, state: SubagentState
     ) -> float:
@@ -738,34 +695,17 @@ Provide your analysis with:
         Returns:
             Confidence score from 0.0 to 1.0.
         """
-        base_confidence = 0.5
-
         # Boost for having scenario data
-        if state.context.get("_scenario_data"):
-            base_confidence += 0.25
+        scenario_boost = 0.25 if state.context.get("_scenario_data") else 0
 
-        # Boost for specific content
-        content_lower = content.lower()
-        if any(
-            phrase in content_lower
-            for phrase in ["key threat", "priority", "recommend", "prepare"]
-        ):
-            base_confidence += 0.1
-
-        if any(
-            phrase in content_lower
-            for phrase in ["willpower", "agility", "combat", "intellect"]
-        ):
-            base_confidence += 0.05
-
-        # Penalty for uncertainty
-        if any(
-            phrase in content_lower
-            for phrase in ["not sure", "unclear", "might", "possibly"]
-        ):
-            base_confidence -= 0.1
-
-        return min(max(base_confidence, 0.1), 0.95)
+        return compute_bounded_confidence(
+            base=0.5 + scenario_boost,
+            adjustments=[
+                (contains_any_phrase(content, self.SPECIFIC_CONTENT_PHRASES), 0.1),
+                (contains_any_phrase(content, self.SKILL_PHRASES), 0.05),
+                (contains_any_phrase(content, self.UNCERTAINTY_PHRASES), -0.1),
+            ],
+        )
 
     def _extract_sources(
         self, content: str, state: SubagentState
@@ -792,6 +732,14 @@ Provide your analysis with:
 
         return sources
 
+    # Query type patterns for classification
+    QUERY_TYPE_PATTERNS = {
+        "threat_analysis": ["threat", "enemy", "danger"],
+        "preparation": ["prepar", "ready", "need", "bring"],
+        "strategy": ["strateg", "approach", "how to", "play"],
+        "encounter_analysis": ["treacher", "encounter"],
+    }
+
     def _determine_query_type(self, query: str) -> str:
         """Classify the type of scenario query.
 
@@ -801,18 +749,9 @@ Provide your analysis with:
         Returns:
             String identifier for the query type.
         """
-        query_lower = query.lower()
-
-        if any(word in query_lower for word in ["threat", "enemy", "danger"]):
-            return "threat_analysis"
-        if any(word in query_lower for word in ["prepar", "ready", "need", "bring"]):
-            return "preparation"
-        if any(word in query_lower for word in ["strateg", "approach", "how to", "play"]):
-            return "strategy"
-        if any(word in query_lower for word in ["treacher", "encounter"]):
-            return "encounter_analysis"
-
-        return "full_analysis"
+        return classify_query_by_keywords(
+            query, self.QUERY_TYPE_PATTERNS, default="full_analysis"
+        )
 
     def query_scenario(
         self,

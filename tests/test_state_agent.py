@@ -288,8 +288,13 @@ class TestStateResponse:
     """Tests for StateResponse output schema."""
 
     def test_default_values(self):
-        """Should have sensible defaults."""
-        response = StateResponse()
+        """Should have sensible defaults for state-specific fields."""
+        from backend.models.subagent_models import SubagentMetadata
+
+        response = StateResponse(
+            content="Test analysis",
+            metadata=SubagentMetadata(agent_type="state"),
+        )
         assert response.curve_analysis == {}
         assert response.type_distribution == {}
         assert response.class_distribution == {}
@@ -302,7 +307,13 @@ class TestStateResponse:
 
     def test_accepts_all_fields(self):
         """Should accept all analysis fields."""
+        from backend.models.subagent_models import SubagentMetadata
+
         response = StateResponse(
+            content="Full analysis",
+            confidence=0.9,
+            sources=["Deck: Test"],
+            metadata=SubagentMetadata(agent_type="state", query_type="deck_analysis"),
             curve_analysis={"0": 5, "1": 8, "2": 10},
             type_distribution={"Asset": 15, "Event": 10},
             class_distribution={"Guardian": 20, "Neutral": 5},
@@ -315,6 +326,8 @@ class TestStateResponse:
         )
         assert response.total_cards == 30
         assert "Guardian" in response.class_distribution
+        assert response.content == "Full analysis"
+        assert response.confidence == 0.9
 
 
 # =============================================================================

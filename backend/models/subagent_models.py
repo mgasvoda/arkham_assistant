@@ -5,9 +5,15 @@ use to return their results. Using Pydantic models ensures type safety
 and enables LangChain's structured output parsing.
 """
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
+
+
+# Type variable for generic class methods
+T = TypeVar("T", bound="SubagentResponse")
 
 
 class SubagentMetadata(BaseModel):
@@ -70,13 +76,36 @@ class SubagentResponse(BaseModel):
     )
 
     @classmethod
+    def _get_error_defaults(cls) -> dict[str, Any]:
+        """Get default field values for error responses.
+
+        Override in subclasses to provide domain-specific default values
+        for custom fields when creating error responses.
+
+        Returns:
+            Dict of field_name -> default_value for error responses.
+
+        Example:
+            >>> class RulesResponse(SubagentResponse):
+            ...     rule_text: str = ""
+            ...
+            ...     @classmethod
+            ...     def _get_error_defaults(cls) -> dict[str, Any]:
+            ...         return {"rule_text": ""}
+        """
+        return {}
+
+    @classmethod
     def error_response(
-        cls,
+        cls: type[T],
         error_message: str,
         agent_type: str,
         confidence: float = 0.0,
-    ) -> "SubagentResponse":
+    ) -> T:
         """Create an error response for graceful degradation.
+
+        This method automatically handles custom fields in subclasses
+        by calling _get_error_defaults() to get appropriate default values.
 
         Args:
             error_message: Description of the error that occurred.
@@ -84,8 +113,9 @@ class SubagentResponse(BaseModel):
             confidence: Confidence score (typically 0 for errors).
 
         Returns:
-            A SubagentResponse indicating an error occurred.
+            A SubagentResponse (or subclass) indicating an error occurred.
         """
+        defaults = cls._get_error_defaults()
         return cls(
             content=error_message,
             confidence=confidence,
@@ -95,4 +125,39 @@ class SubagentResponse(BaseModel):
                 query_type="error",
                 extra={"error": True},
             ),
+            **defaults,
+        )
+
+    @classmethod
+    def from_base_response(
+        cls: type[T],
+        base_response: SubagentResponse,
+        **extra_fields: Any,
+    ) -> T:
+        """Create a subclass instance from a base SubagentResponse.
+
+        This is useful when an LLM returns a base SubagentResponse and
+        you need to convert it to a specialized response type with
+        additional fields.
+
+        Args:
+            base_response: The base response to extend.
+            **extra_fields: Additional fields for the subclass.
+
+        Returns:
+            Instance of the subclass with all fields populated.
+
+        Example:
+            >>> rules_response = RulesResponse.from_base_response(
+            ...     base_response,
+            ...     rule_text="According to the rules...",
+            ...     interpretation="This means...",
+            ... )
+        """
+        return cls(
+            content=base_response.content,
+            confidence=base_response.confidence,
+            sources=base_response.sources,
+            metadata=base_response.metadata,
+            **extra_fields,
         )

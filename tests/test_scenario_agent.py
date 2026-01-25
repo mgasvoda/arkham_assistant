@@ -160,9 +160,10 @@ class TestScenarioResponse:
 
     def test_error_response(self):
         """Should create error response."""
-        response = ScenarioResponse.error_response("Something went wrong")
+        response = ScenarioResponse.error_response("Something went wrong", "scenario")
         assert response.content == "Something went wrong"
         assert response.confidence == 0.0
+        assert response.metadata.agent_type == "scenario"
         assert response.metadata.query_type == "error"
         assert response.metadata.extra.get("error") is True
         assert response.scenario_name == ""

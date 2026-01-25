@@ -26,6 +26,11 @@ from backend.services.subagents.base import (
     SubagentConfig,
     SubagentState,
 )
+from backend.services.subagents.utils import (
+    classify_query_by_keywords,
+    compute_bounded_confidence,
+    contains_any_phrase,
+)
 
 
 # =============================================================================
@@ -80,64 +85,13 @@ class RulesResponse(SubagentResponse):
     )
 
     @classmethod
-    def from_base_response(
-        cls,
-        base_response: SubagentResponse,
-        rule_text: str = "",
-        interpretation: str = "",
-        applies_to: list[str] | None = None,
-    ) -> "RulesResponse":
-        """Create a RulesResponse from a base SubagentResponse.
-
-        Args:
-            base_response: The base response to extend.
-            rule_text: The relevant rule excerpt.
-            interpretation: Plain-language explanation.
-            applies_to: What the rule affects.
-
-        Returns:
-            RulesResponse with all fields populated.
-        """
-        return cls(
-            content=base_response.content,
-            confidence=base_response.confidence,
-            sources=base_response.sources,
-            metadata=base_response.metadata,
-            rule_text=rule_text,
-            interpretation=interpretation,
-            applies_to=applies_to or [],
-        )
-
-    @classmethod
-    def error_response(
-        cls,
-        error_message: str,
-        agent_type: str = "rules",
-        confidence: float = 0.0,
-    ) -> "RulesResponse":
-        """Create an error response for graceful degradation.
-
-        Args:
-            error_message: Description of the error.
-            agent_type: The agent type (default: "rules").
-            confidence: Confidence score (typically 0 for errors).
-
-        Returns:
-            A RulesResponse indicating an error occurred.
-        """
-        return cls(
-            content=error_message,
-            confidence=confidence,
-            sources=[],
-            metadata=SubagentMetadata(
-                agent_type=agent_type,
-                query_type="error",
-                extra={"error": True},
-            ),
-            rule_text="",
-            interpretation="",
-            applies_to=[],
-        )
+    def _get_error_defaults(cls) -> dict[str, Any]:
+        """Provide default values for rules-specific fields in error responses."""
+        return {
+            "rule_text": "",
+            "interpretation": "",
+            "applies_to": [],
+        }
 
 
 # =============================================================================
@@ -614,6 +568,30 @@ Structure your response as follows:
 
         return rule_text, interpretation, applies_to
 
+    # Confidence adjustment phrases
+    HIGH_CONFIDENCE_PHRASES = [
+        "according to the rules",
+        "the rules state",
+        "rule reference",
+        "is legal",
+        "is not legal",
+        "cannot include",
+        "must include",
+    ]
+    MEDIUM_CONFIDENCE_PHRASES = [
+        "can include",
+        "may include",
+        "restricted to",
+        "level 0-",
+    ]
+    UNCERTAINTY_PHRASES = [
+        "not sure",
+        "unclear",
+        "might be",
+        "possibly",
+        "i think",
+    ]
+
     def _calculate_confidence(
         self, content: str, state: SubagentState
     ) -> float:
@@ -631,44 +609,17 @@ Structure your response as follows:
         Returns:
             Confidence score from 0.0 to 1.0.
         """
-        content_lower = content.lower()
-        base_confidence = 0.5
-
-        # Boost for retrieved context
         retrieved = state.context.get("_retrieved_sections", [])
-        if retrieved:
-            base_confidence += 0.15 * min(len(retrieved), 3) / 3
+        retrieved_boost = 0.15 * min(len(retrieved), 3) / 3 if retrieved else 0
 
-        # High confidence indicators
-        if any(
-            phrase in content_lower
-            for phrase in [
-                "according to the rules",
-                "the rules state",
-                "rule reference",
-                "is legal",
-                "is not legal",
-                "cannot include",
-                "must include",
-            ]
-        ):
-            base_confidence += 0.2
-
-        # Medium confidence indicators
-        if any(
-            phrase in content_lower
-            for phrase in ["can include", "may include", "restricted to", "level 0-"]
-        ):
-            base_confidence += 0.1
-
-        # Penalty for uncertainty language
-        if any(
-            phrase in content_lower
-            for phrase in ["not sure", "unclear", "might be", "possibly", "i think"]
-        ):
-            base_confidence -= 0.15
-
-        return min(max(base_confidence, 0.1), 0.95)
+        return compute_bounded_confidence(
+            base=0.5 + retrieved_boost,
+            adjustments=[
+                (contains_any_phrase(content, self.HIGH_CONFIDENCE_PHRASES), 0.2),
+                (contains_any_phrase(content, self.MEDIUM_CONFIDENCE_PHRASES), 0.1),
+                (contains_any_phrase(content, self.UNCERTAINTY_PHRASES), -0.15),
+            ],
+        )
 
     def _extract_sources(
         self, content: str, state: SubagentState
@@ -702,6 +653,16 @@ Structure your response as follows:
 
         return sources
 
+    # Query type patterns for classification (order matters - more specific first)
+    QUERY_TYPE_PATTERNS = {
+        "taboo_check": ["taboo"],
+        "signature_rules": ["signature", "required"],
+        "weakness_rules": ["weakness", "basic weakness"],
+        "xp_rules": ["xp", "experience", "upgrade"],
+        "class_access": ["class", "faction"],
+        "legality_check": ["legal", "include", "can ", "allow"],
+    }
+
     def _determine_query_type(self, query: str) -> str:
         """Classify the type of rules query.
 
@@ -713,30 +674,18 @@ Structure your response as follows:
         """
         query_lower = query.lower()
 
-        # Check specific patterns first (order matters!)
-        if "taboo" in query_lower:
-            return "taboo_check"
-        if any(word in query_lower for word in ["signature", "required"]):
-            return "signature_rules"
-        if any(word in query_lower for word in ["weakness", "basic weakness"]):
-            return "weakness_rules"
-        # XP/level rules - check before legality since "level" is more specific
-        if any(word in query_lower for word in ["xp", "experience", "upgrade"]):
-            return "xp_rules"
+        # Check compound conditions first (not handled by simple keyword matching)
         if "level" in query_lower and "card" in query_lower:
             return "xp_rules"
-        # Class access - check before generic legality
-        if any(word in query_lower for word in ["class", "faction"]):
-            return "class_access"
         if "access" in query_lower and any(
             word in query_lower for word in ["card", "what", "which"]
         ):
             return "class_access"
-        # Generic legality check
-        if any(word in query_lower for word in ["legal", "include", "can ", "allow"]):
-            return "legality_check"
 
-        return "general_rules"
+        # Use utility for simple keyword matching
+        return classify_query_by_keywords(
+            query, self.QUERY_TYPE_PATTERNS, default="general_rules"
+        )
 
     def query_rules(
         self,

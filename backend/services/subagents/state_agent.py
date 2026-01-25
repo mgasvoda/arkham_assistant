@@ -10,8 +10,10 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.services.agent_tools import get_card_details, get_deck, summarize_deck
+from backend.models.subagent_models import SubagentMetadata, SubagentResponse
+from backend.services.agent_tools import get_deck
 from backend.services.chroma_client import ChromaClient
+from backend.services.subagents.utils import CardDataLoader
 
 
 # =============================================================================
@@ -58,8 +60,10 @@ class SynergyInfo(BaseModel):
     )
 
 
-class StateResponse(BaseModel):
+class StateResponse(SubagentResponse):
     """Structured response from StateAgent analysis.
+
+    Extends SubagentResponse with detailed deck analysis fields.
 
     Attributes:
         curve_analysis: Resource curve distribution (cost -> count)
@@ -109,6 +113,21 @@ class StateResponse(BaseModel):
         default=None,
         description="Investigator name"
     )
+
+    @classmethod
+    def _get_error_defaults(cls) -> dict[str, Any]:
+        """Provide default values for state-specific fields in error responses."""
+        return {
+            "curve_analysis": {},
+            "type_distribution": {},
+            "class_distribution": {},
+            "identified_gaps": [],
+            "strengths": [],
+            "synergies": [],
+            "upgrade_priority": [],
+            "total_cards": 0,
+            "investigator_name": None,
+        }
 
 
 # =============================================================================
@@ -223,9 +242,14 @@ class StateAgent:
     This agent can work with either a stored deck (by ID) or a raw card list.
     """
 
-    def __init__(self):
-        """Initialize the StateAgent."""
-        self._client: Optional[ChromaClient] = None
+    def __init__(self, chroma_client: Optional[ChromaClient] = None):
+        """Initialize the StateAgent.
+
+        Args:
+            chroma_client: Optional ChromaDB client. If None, creates one lazily.
+        """
+        self._client: Optional[ChromaClient] = chroma_client
+        self._card_loader: Optional[CardDataLoader] = None
 
     @property
     def client(self) -> ChromaClient:
@@ -233,6 +257,13 @@ class StateAgent:
         if self._client is None:
             self._client = ChromaClient()
         return self._client
+
+    @property
+    def card_loader(self) -> CardDataLoader:
+        """Lazy-load CardDataLoader."""
+        if self._card_loader is None:
+            self._card_loader = CardDataLoader(self.client)
+        return self._card_loader
 
     def analyze(self, query: StateQuery) -> StateResponse:
         """Perform comprehensive deck analysis.
@@ -251,20 +282,66 @@ class StateAgent:
 
         if not cards:
             return StateResponse(
+                content="Empty deck - no cards to analyze",
+                confidence=0.0,
+                sources=[],
+                metadata=SubagentMetadata(
+                    agent_type="state",
+                    query_type="empty_deck",
+                ),
                 investigator_name=investigator_name,
                 identified_gaps=["Empty deck - no cards to analyze"],
             )
 
+        # Perform analyses
+        curve = self._analyze_curve(cards)
+        types = self._analyze_types(cards)
+        classes = self._analyze_classes(cards)
+        gaps = self._identify_gaps(cards)
+        strengths = self._identify_strengths(cards)
+        synergies = self._detect_synergies(cards)
+        upgrades = self._prioritize_upgrades(cards, query.upgrade_points)
+        total = self._count_cards(cards)
+
+        # Build summary content
+        content_parts = [f"Deck analysis for {investigator_name or 'Unknown'}:"]
+        content_parts.append(f"- {total} total cards")
+        if gaps:
+            content_parts.append(f"- {len(gaps)} identified gaps")
+        if strengths:
+            content_parts.append(f"- {len(strengths)} strengths")
+        if synergies:
+            content_parts.append(f"- {len(synergies)} synergies detected")
+
+        # Build sources
+        sources = []
+        if deck_name:
+            sources.append(f"Deck: {deck_name}")
+        if investigator_name:
+            sources.append(f"Investigator: {investigator_name}")
+
         # Build response with all analyses
         response = StateResponse(
-            curve_analysis=self._analyze_curve(cards),
-            type_distribution=self._analyze_types(cards),
-            class_distribution=self._analyze_classes(cards),
-            identified_gaps=self._identify_gaps(cards),
-            strengths=self._identify_strengths(cards),
-            synergies=self._detect_synergies(cards),
-            upgrade_priority=self._prioritize_upgrades(cards, query.upgrade_points),
-            total_cards=self._count_cards(cards),
+            content="\n".join(content_parts),
+            confidence=0.9 if cards else 0.0,
+            sources=sources,
+            metadata=SubagentMetadata(
+                agent_type="state",
+                query_type="deck_analysis",
+                context_used={
+                    "deck_id": query.deck_id,
+                    "investigator_id": query.investigator_id,
+                    "upgrade_points": query.upgrade_points,
+                },
+            ),
+            curve_analysis=curve,
+            type_distribution=types,
+            class_distribution=classes,
+            identified_gaps=gaps,
+            strengths=strengths,
+            synergies=synergies,
+            upgrade_priority=upgrades,
+            total_cards=total,
             investigator_name=investigator_name,
         )
 
@@ -331,42 +408,7 @@ class StateAgent:
         Returns:
             List of card dicts with full data and "count" field
         """
-        cards = []
-        card_counts: dict[str, int] = {}
-
-        # Parse input format to get card IDs and counts
-        if isinstance(cards_data, dict):
-            # Dict mapping card_id -> count
-            for card_id, count in cards_data.items():
-                card_counts[card_id] = count
-        elif isinstance(cards_data, list):
-            for item in cards_data:
-                if isinstance(item, str):
-                    # Simple card ID
-                    card_counts[item] = card_counts.get(item, 0) + 1
-                elif isinstance(item, dict):
-                    # Dict with id and optional count
-                    card_id = item.get("id") or item.get("code")
-                    if card_id:
-                        count = item.get("count", 1)
-                        card_counts[card_id] = count
-
-        # Fetch full card data
-        for card_id, count in card_counts.items():
-            card = self.client.get_card(card_id)
-            if card:
-                # Parse JSON fields
-                for field in ["traits", "icons"]:
-                    if field in card and isinstance(card[field], str):
-                        try:
-                            card[field] = json.loads(card[field])
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-
-                card["count"] = count
-                cards.append(card)
-
-        return cards
+        return self.card_loader.load_card_list(cards_data)
 
     def _count_cards(self, cards: list[dict]) -> int:
         """Count total cards considering quantities."""

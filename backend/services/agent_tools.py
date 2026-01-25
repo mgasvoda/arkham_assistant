@@ -16,10 +16,12 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from backend.services.chroma_client import ChromaClient
+from backend.services.subagents.utils import CardDataLoader
 
 
-# Module-level client instance (lazy initialization)
+# Module-level instances (lazy initialization)
 _chroma_client: Optional[ChromaClient] = None
+_card_loader: Optional[CardDataLoader] = None
 
 
 def _get_client() -> ChromaClient:
@@ -28,6 +30,14 @@ def _get_client() -> ChromaClient:
     if _chroma_client is None:
         _chroma_client = ChromaClient()
     return _chroma_client
+
+
+def _get_card_loader() -> CardDataLoader:
+    """Get or create the CardDataLoader instance."""
+    global _card_loader
+    if _card_loader is None:
+        _card_loader = CardDataLoader(_get_client())
+    return _card_loader
 
 
 class CardNotFoundError(Exception):
@@ -63,23 +73,12 @@ def get_card_details(card_ids: list[str]) -> list[dict]:
     if not card_ids:
         return []
 
-    client = _get_client()
-    cards = []
-    not_found = []
+    loader = _get_card_loader()
+    cards = loader.fetch_cards(card_ids, parse_json=True)
 
-    for card_id in card_ids:
-        card = client.get_card(card_id)
-        if card is None:
-            not_found.append(card_id)
-        else:
-            # Parse JSON fields if they exist
-            for field in ["traits", "icons", "upgrades"]:
-                if field in card and isinstance(card[field], str):
-                    try:
-                        card[field] = json.loads(card[field])
-                    except (json.JSONDecodeError, TypeError):
-                        pass  # Keep as string if not valid JSON
-            cards.append(card)
+    # Check if any cards were not found
+    found_ids = {card.get("code") or card.get("id") for card in cards}
+    not_found = [cid for cid in card_ids if cid not in found_ids]
 
     if not_found:
         raise CardNotFoundError(f"Cards not found: {', '.join(not_found)}")
@@ -280,40 +279,16 @@ def summarize_deck(deck_id: str) -> dict:
         except (json.JSONDecodeError, TypeError):
             return summary
 
-    # Handle different card list formats
-    # Format 1: List of card IDs ["01001", "01002"]
-    # Format 2: List of dicts [{"id": "01001", "count": 2}]
-    # Format 3: Dict mapping card_id -> count {"01001": 2}
-    card_ids = []
-    card_counts = {}
-
-    if isinstance(cards_data, list):
-        for item in cards_data:
-            if isinstance(item, str):
-                card_ids.append(item)
-                card_counts[item] = card_counts.get(item, 0) + 1
-            elif isinstance(item, dict):
-                card_id = item.get("id") or item.get("code")
-                if card_id:
-                    count = item.get("count", 1)
-                    card_ids.append(card_id)
-                    card_counts[card_id] = count
-    elif isinstance(cards_data, dict):
-        for card_id, count in cards_data.items():
-            card_ids.append(card_id)
-            card_counts[card_id] = count
-
-    # Remove duplicates while preserving order
-    unique_card_ids = list(dict.fromkeys(card_ids))
+    # Use CardDataLoader to normalize input and fetch card data
+    loader = _get_card_loader()
+    card_counts = loader.normalize_card_input(cards_data)
 
     # Fetch card details (don't fail on missing cards)
-    client = _get_client()
-    for card_id in unique_card_ids:
-        card = client.get_card(card_id)
+    for card_id, count in card_counts.items():
+        card = _get_client().get_card(card_id)
         if card is None:
             continue
 
-        count = card_counts.get(card_id, 1)
         summary["total_cards"] += count
 
         # Resource curve (by cost)

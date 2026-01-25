@@ -118,6 +118,11 @@ class ActionSpaceResponse(SubagentResponse):
         description="Ranked list of card candidates matching the query"
     )
 
+    @classmethod
+    def _get_error_defaults(cls) -> dict[str, Any]:
+        """Provide default values for action space fields in error responses."""
+        return {"candidates": []}
+
 
 # =============================================================================
 # Investigator Class Access Rules
