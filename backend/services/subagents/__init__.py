@@ -25,6 +25,13 @@ from backend.services.subagents.base import (
     # Factory function
     create_subagent,
 )
+from backend.services.subagents.action_space_agent import (
+    ActionSpaceAgent,
+    ActionSpaceQuery,
+    ActionSpaceResponse,
+    CardCandidate,
+    create_action_space_agent,
+)
 
 from backend.services.subagents.rules_agent import (
     # Enhanced RulesAgent with hybrid retrieval
@@ -46,6 +53,12 @@ __all__ = [
     "StateSubagent",
     "ActionSpaceSubagent",
     "ScenarioSubagent",
+    # ActionSpaceAgent (full implementation)
+    "ActionSpaceAgent",
+    "ActionSpaceQuery",
+    "ActionSpaceResponse",
+    "CardCandidate",
+    "create_action_space_agent",
     # Enhanced RulesAgent with hybrid retrieval
     "RulesAgent",
     "RulesQuery",
