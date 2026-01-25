@@ -16,6 +16,23 @@ from backend.services.agent_tools import (
     recommend_cards,
     summarize_deck,
     _get_client,
+    # LangGraph tools
+    card_lookup_tool,
+    deck_lookup_tool,
+    static_info_tool,
+    deck_summary_tool,
+    simulation_tool,
+    recommendation_tool,
+    AGENT_TOOLS,
+    IMPLEMENTED_TOOLS,
+    STUB_TOOLS,
+    # Pydantic schemas
+    CardLookupInput,
+    DeckLookupInput,
+    StaticInfoInput,
+    DeckSummaryInput,
+    SimulationInput,
+    RecommendationInput,
 )
 
 
@@ -367,3 +384,244 @@ class TestSummarizeDeck:
 
         with pytest.raises(DeckNotFoundError):
             summarize_deck("nonexistent")
+
+
+# ============================================================================
+# Pydantic Input Schema tests
+# ============================================================================
+
+
+class TestPydanticSchemas:
+    """Tests for Pydantic input schemas."""
+
+    def test_card_lookup_input_valid(self):
+        """Should accept valid card IDs list."""
+        schema = CardLookupInput(card_ids=["01001", "01002"])
+        assert schema.card_ids == ["01001", "01002"]
+
+    def test_card_lookup_input_empty_list(self):
+        """Should accept empty list."""
+        schema = CardLookupInput(card_ids=[])
+        assert schema.card_ids == []
+
+    def test_deck_lookup_input_valid(self):
+        """Should accept valid deck ID."""
+        schema = DeckLookupInput(deck_id="deck_abc123")
+        assert schema.deck_id == "deck_abc123"
+
+    def test_static_info_input_valid_topics(self):
+        """Should accept all valid topic values."""
+        for topic in ["rules", "meta", "owned_sets", "owned"]:
+            schema = StaticInfoInput(topic=topic)
+            assert schema.topic == topic
+
+    def test_static_info_input_invalid_topic(self):
+        """Should reject invalid topic values."""
+        with pytest.raises(ValueError):
+            StaticInfoInput(topic="invalid_topic")
+
+    def test_simulation_input_defaults(self):
+        """Should use default n_trials value."""
+        schema = SimulationInput(deck_id="deck_123")
+        assert schema.n_trials == 1000
+
+    def test_simulation_input_custom_trials(self):
+        """Should accept custom n_trials value."""
+        schema = SimulationInput(deck_id="deck_123", n_trials=500)
+        assert schema.n_trials == 500
+
+    def test_simulation_input_trial_bounds(self):
+        """Should enforce n_trials bounds."""
+        with pytest.raises(ValueError):
+            SimulationInput(deck_id="deck_123", n_trials=0)
+        with pytest.raises(ValueError):
+            SimulationInput(deck_id="deck_123", n_trials=20000)
+
+    def test_recommendation_input_defaults(self):
+        """Should use default goal value."""
+        schema = RecommendationInput(deck_id="deck_123")
+        assert schema.goal == "balance"
+
+    def test_recommendation_input_valid_goals(self):
+        """Should accept all valid goal values."""
+        for goal in ["balance", "card_draw", "economy", "combat", "clues"]:
+            schema = RecommendationInput(deck_id="deck_123", goal=goal)
+            assert schema.goal == goal
+
+    def test_recommendation_input_invalid_goal(self):
+        """Should reject invalid goal values."""
+        with pytest.raises(ValueError):
+            RecommendationInput(deck_id="deck_123", goal="invalid_goal")
+
+
+# ============================================================================
+# LangGraph Tool Wrapper tests
+# ============================================================================
+
+
+class TestCardLookupTool:
+    """Tests for card_lookup_tool LangGraph wrapper."""
+
+    def test_returns_json_string(self, mock_chroma_client, sample_card_data):
+        """Should return JSON-formatted string."""
+        mock_chroma_client.get_card.return_value = sample_card_data.copy()
+
+        result = card_lookup_tool.invoke({"card_ids": ["01001"]})
+
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+
+    def test_returns_error_json_for_missing_card(self, mock_chroma_client):
+        """Should return error JSON when card not found."""
+        mock_chroma_client.get_card.return_value = None
+
+        result = card_lookup_tool.invoke({"card_ids": ["nonexistent"]})
+
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert card_lookup_tool.name == "card_lookup"
+
+    def test_tool_has_description(self):
+        """Should have a description for LLM."""
+        assert card_lookup_tool.description
+        assert "card" in card_lookup_tool.description.lower()
+
+
+class TestDeckLookupTool:
+    """Tests for deck_lookup_tool LangGraph wrapper."""
+
+    def test_returns_json_string(self, mock_chroma_client, sample_deck_data):
+        """Should return JSON-formatted string."""
+        mock_chroma_client.get_deck.return_value = sample_deck_data.copy()
+
+        result = deck_lookup_tool.invoke({"deck_id": "deck_abc123"})
+
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed["name"] == "Roland's Starter"
+
+    def test_returns_error_json_for_missing_deck(self, mock_chroma_client):
+        """Should return error JSON when deck not found."""
+        mock_chroma_client.get_deck.return_value = None
+
+        result = deck_lookup_tool.invoke({"deck_id": "nonexistent"})
+
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert deck_lookup_tool.name == "deck_lookup"
+
+
+class TestStaticInfoTool:
+    """Tests for static_info_tool LangGraph wrapper."""
+
+    def test_returns_markdown_content(self):
+        """Should return markdown file content."""
+        result = static_info_tool.invoke({"topic": "rules"})
+
+        assert isinstance(result, str)
+        assert "Arkham Horror" in result
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert static_info_tool.name == "static_info"
+
+
+class TestDeckSummaryTool:
+    """Tests for deck_summary_tool LangGraph wrapper."""
+
+    def test_returns_json_string(self, mock_chroma_client, sample_deck_data):
+        """Should return JSON-formatted summary."""
+        mock_chroma_client.get_deck.return_value = sample_deck_data.copy()
+        mock_chroma_client.get_card.return_value = None
+
+        result = deck_summary_tool.invoke({"deck_id": "deck_abc123"})
+
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert "deck_name" in parsed
+        assert "curve" in parsed
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert deck_summary_tool.name == "deck_summary"
+
+
+class TestSimulationTool:
+    """Tests for simulation_tool LangGraph wrapper (stub)."""
+
+    def test_returns_stub_json(self):
+        """Should return stub response as JSON."""
+        result = simulation_tool.invoke({"deck_id": "deck_123", "n_trials": 100})
+
+        parsed = json.loads(result)
+        assert parsed["error"] == "Simulation not yet implemented"
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert simulation_tool.name == "run_simulation"
+
+
+class TestRecommendationTool:
+    """Tests for recommendation_tool LangGraph wrapper (stub)."""
+
+    def test_returns_empty_list_json(self):
+        """Should return empty list as JSON."""
+        result = recommendation_tool.invoke({"deck_id": "deck_123", "goal": "combat"})
+
+        parsed = json.loads(result)
+        assert parsed == []
+
+    def test_tool_has_correct_name(self):
+        """Should have correct tool name."""
+        assert recommendation_tool.name == "recommend_cards"
+
+
+# ============================================================================
+# Tool Registry tests
+# ============================================================================
+
+
+class TestToolRegistry:
+    """Tests for tool registry exports."""
+
+    def test_agent_tools_contains_all_tools(self):
+        """Should contain all 6 tools."""
+        assert len(AGENT_TOOLS) == 6
+        tool_names = [t.name for t in AGENT_TOOLS]
+        assert "card_lookup" in tool_names
+        assert "deck_lookup" in tool_names
+        assert "static_info" in tool_names
+        assert "deck_summary" in tool_names
+        assert "run_simulation" in tool_names
+        assert "recommend_cards" in tool_names
+
+    def test_implemented_tools_list(self):
+        """Should contain 4 implemented tools."""
+        assert len(IMPLEMENTED_TOOLS) == 4
+        tool_names = [t.name for t in IMPLEMENTED_TOOLS]
+        assert "card_lookup" in tool_names
+        assert "deck_lookup" in tool_names
+        assert "static_info" in tool_names
+        assert "deck_summary" in tool_names
+
+    def test_stub_tools_list(self):
+        """Should contain 2 stub tools."""
+        assert len(STUB_TOOLS) == 2
+        tool_names = [t.name for t in STUB_TOOLS]
+        assert "run_simulation" in tool_names
+        assert "recommend_cards" in tool_names
+
+    def test_all_tools_are_langchain_tools(self):
+        """All tools should be valid LangChain tools."""
+        from langchain_core.tools import BaseTool
+
+        for tool in AGENT_TOOLS:
+            assert isinstance(tool, BaseTool)

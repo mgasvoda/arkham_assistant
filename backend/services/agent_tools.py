@@ -2,11 +2,18 @@
 
 These functions are called as tools by the LLM agent during chat interactions.
 They provide access to card data, deck information, and static reference content.
+
+This module provides both:
+1. Core functions (get_card_details, get_deck, etc.) for direct Python usage
+2. LangGraph tool wrappers (card_lookup_tool, deck_lookup_tool, etc.) for agent integration
 """
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
+
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 from backend.services.chroma_client import ChromaClient
 
@@ -328,4 +335,187 @@ def summarize_deck(deck_id: str) -> dict:
         )
 
     return summary
+
+
+# =============================================================================
+# Pydantic Input Schemas for LangGraph Tools
+# =============================================================================
+
+
+class CardLookupInput(BaseModel):
+    """Input schema for looking up cards by their IDs."""
+
+    card_ids: list[str] = Field(
+        description="List of card IDs to retrieve (e.g., ['01016', '01017'])"
+    )
+
+
+class DeckLookupInput(BaseModel):
+    """Input schema for retrieving a deck by ID."""
+
+    deck_id: str = Field(description="The unique identifier of the deck to retrieve")
+
+
+class StaticInfoInput(BaseModel):
+    """Input schema for retrieving static reference information."""
+
+    topic: Literal["rules", "meta", "owned_sets", "owned"] = Field(
+        description=(
+            "The topic to retrieve. Options: "
+            "'rules' (game rules), "
+            "'meta' (current meta trends), "
+            "'owned_sets' or 'owned' (user's card collection)"
+        )
+    )
+
+
+class DeckSummaryInput(BaseModel):
+    """Input schema for generating a deck summary."""
+
+    deck_id: str = Field(description="The unique identifier of the deck to summarize")
+
+
+class SimulationInput(BaseModel):
+    """Input schema for running deck simulations."""
+
+    deck_id: str = Field(description="The unique identifier of the deck to simulate")
+    n_trials: int = Field(
+        default=1000,
+        description="Number of simulation trials to run (default: 1000)",
+        ge=1,
+        le=10000,
+    )
+
+
+class RecommendationInput(BaseModel):
+    """Input schema for getting card recommendations."""
+
+    deck_id: str = Field(description="The unique identifier of the deck to analyze")
+    goal: Literal["balance", "card_draw", "economy", "combat", "clues"] = Field(
+        default="balance",
+        description=(
+            "Optimization goal: 'balance' (overall), 'card_draw' (consistency), "
+            "'economy' (resources), 'combat' (enemies), 'clues' (investigation)"
+        ),
+    )
+
+
+# =============================================================================
+# LangGraph Tool Wrappers
+# =============================================================================
+
+
+@tool("card_lookup", args_schema=CardLookupInput)
+def card_lookup_tool(card_ids: list[str]) -> str:
+    """Look up detailed information about specific Arkham Horror LCG cards.
+
+    Use this tool when you need to retrieve card details like cost, type,
+    text, traits, or icons for one or more cards. Returns full card data
+    from the database.
+    """
+    try:
+        cards = get_card_details(card_ids)
+        return json.dumps(cards, indent=2)
+    except CardNotFoundError as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool("deck_lookup", args_schema=DeckLookupInput)
+def deck_lookup_tool(deck_id: str) -> str:
+    """Retrieve a deck's full definition including investigator and card list.
+
+    Use this tool when you need to see what cards are in a deck, who the
+    investigator is, or access deck metadata like archetype and notes.
+    """
+    try:
+        deck = get_deck(deck_id)
+        return json.dumps(deck, indent=2)
+    except DeckNotFoundError as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool("static_info", args_schema=StaticInfoInput)
+def static_info_tool(topic: str) -> str:
+    """Retrieve reference information about game rules, meta, or card collection.
+
+    Use this tool to access:
+    - 'rules': Game rules overview (actions, resources, deck construction)
+    - 'meta': Current meta trends and popular archetypes
+    - 'owned_sets' or 'owned': User's card collection checklist
+    """
+    try:
+        content = get_static_info(topic)
+        return content
+    except StaticFileNotFoundError as e:
+        return f"Error: {e}"
+
+
+@tool("deck_summary", args_schema=DeckSummaryInput)
+def deck_summary_tool(deck_id: str) -> str:
+    """Generate a summary analysis of a deck's composition.
+
+    Use this tool to get an overview of a deck including:
+    - Resource curve (cost distribution)
+    - Class distribution (Guardian, Seeker, etc.)
+    - Card type breakdown (Assets, Events, Skills)
+    - Total card count and archetype
+    """
+    try:
+        summary = summarize_deck(deck_id)
+        return json.dumps(summary, indent=2)
+    except DeckNotFoundError as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool("run_simulation", args_schema=SimulationInput)
+def simulation_tool(deck_id: str, n_trials: int = 1000) -> str:
+    """Run Monte Carlo simulations to analyze deck performance.
+
+    Note: This tool is not yet implemented and will return a placeholder response.
+    When implemented, it will provide metrics like draw consistency, resource
+    curves, and key card timing.
+    """
+    result = run_simulation_tool(deck_id, n_trials)
+    return json.dumps(result, indent=2)
+
+
+@tool("recommend_cards", args_schema=RecommendationInput)
+def recommendation_tool(deck_id: str, goal: str = "balance") -> str:
+    """Get AI-powered card recommendations for improving a deck.
+
+    Note: This tool is not yet implemented and will return an empty list.
+    When implemented, it will suggest cards to add or remove based on the
+    specified optimization goal.
+    """
+    result = recommend_cards(deck_id, goal)
+    return json.dumps(result, indent=2)
+
+
+# =============================================================================
+# Tool Registry for Orchestrator
+# =============================================================================
+
+# List of all available LangGraph tools for binding to the LLM
+AGENT_TOOLS = [
+    card_lookup_tool,
+    deck_lookup_tool,
+    static_info_tool,
+    deck_summary_tool,
+    simulation_tool,
+    recommendation_tool,
+]
+
+# Tools that are fully implemented (not stubs)
+IMPLEMENTED_TOOLS = [
+    card_lookup_tool,
+    deck_lookup_tool,
+    static_info_tool,
+    deck_summary_tool,
+]
+
+# Stub tools (placeholders for future implementation)
+STUB_TOOLS = [
+    simulation_tool,
+    recommendation_tool,
+]
 
