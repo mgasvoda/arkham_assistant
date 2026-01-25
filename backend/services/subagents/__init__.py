@@ -25,6 +25,13 @@ from backend.services.subagents.base import (
     # Factory function
     create_subagent,
 )
+from backend.services.subagents.action_space_agent import (
+    ActionSpaceAgent,
+    ActionSpaceQuery,
+    ActionSpaceResponse,
+    CardCandidate,
+    create_action_space_agent,
+)
 
 __all__ = [
     # Base classes and exceptions
@@ -37,6 +44,12 @@ __all__ = [
     "StateSubagent",
     "ActionSpaceSubagent",
     "ScenarioSubagent",
+    # ActionSpaceAgent (full implementation)
+    "ActionSpaceAgent",
+    "ActionSpaceQuery",
+    "ActionSpaceResponse",
+    "CardCandidate",
+    "create_action_space_agent",
     # Factory function
     "create_subagent",
 ]
