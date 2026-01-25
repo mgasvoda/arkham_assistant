@@ -12,7 +12,7 @@ structured responses.
 import asyncio
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -23,6 +23,9 @@ from pydantic import BaseModel
 from backend.models.subagent_models import SubagentMetadata, SubagentResponse
 from backend.services.llm_config import get_llm_config
 from backend.services.prompts import AGENT_TYPES, format_subagent_prompt
+
+# Import cache conditionally to avoid circular imports
+# The cache module is imported lazily when needed
 
 
 # =============================================================================
@@ -138,12 +141,14 @@ class BaseSubagent(ABC):
         self,
         agent_type: Literal["rules", "state", "action_space", "scenario"],
         config: SubagentConfig | None = None,
+        use_cache: bool = True,
     ) -> None:
         """Initialize the subagent.
 
         Args:
             agent_type: The type of subagent (must be a valid AGENT_TYPES value).
             config: Optional configuration. If not provided, loads from environment.
+            use_cache: Whether to use response caching (default: True).
 
         Raises:
             ValueError: If agent_type is not recognized.
@@ -156,6 +161,8 @@ class BaseSubagent(ABC):
 
         self.agent_type = agent_type
         self.config = config or SubagentConfig.from_env()
+        self.use_cache = use_cache
+        self._cache = None  # Lazy loaded
         self.llm = self._create_llm()
         self.graph = self._build_graph()
 
@@ -290,12 +297,33 @@ class BaseSubagent(ABC):
         )
         return {"response": response}
 
+    def _get_cache(self):
+        """Get the cache instance, lazily loaded.
+
+        Returns:
+            SubagentCache instance or None if caching disabled.
+        """
+        if not self.use_cache:
+            return None
+
+        if self._cache is None:
+            # Lazy import to avoid circular dependencies
+            from backend.services.subagents.cache import get_subagent_cache
+            self._cache = get_subagent_cache()
+
+        return self._cache
+
     def query(self, query: str, context: dict[str, Any] | None = None) -> SubagentResponse:
         """Execute a query against this subagent.
 
         This is the main interface for invoking a subagent. The query
         is processed through the LangGraph with the provided context,
         and a structured response is returned.
+
+        Caching:
+            If caching is enabled (use_cache=True), responses are cached
+            based on agent type, query, and context. Subsequent identical
+            queries will return the cached response until TTL expires.
 
         Args:
             query: The user's question or request.
@@ -317,6 +345,15 @@ class BaseSubagent(ABC):
         """
         context = context or {}
 
+        # Check cache first
+        cache = self._get_cache()
+        if cache:
+            cached_response = cache.get_cached_response(
+                self.agent_type, query, context
+            )
+            if cached_response:
+                return cached_response
+
         # Create initial state
         initial_state = SubagentState(query=query, context=context)
 
@@ -337,6 +374,13 @@ class BaseSubagent(ABC):
                         and "prompt" in response.content.lower()
                     ):
                         return response
+
+                    # Cache successful response
+                    if cache and response.confidence > 0:
+                        cache.cache_response(
+                            self.agent_type, query, response, context
+                        )
+
                     return response
 
                 # Handle unexpected state format
@@ -380,7 +424,7 @@ class BaseSubagent(ABC):
                 asyncio.to_thread(self.query, query, context),
                 timeout=self.config.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return SubagentResponse.error_response(
                 error_message=f"Query timed out after {self.config.timeout_seconds}s",
                 agent_type=self.agent_type,
@@ -450,8 +494,12 @@ class BaseSubagent(ABC):
 class RulesSubagent(BaseSubagent):
     """Subagent for deckbuilding rules and card legality questions."""
 
-    def __init__(self, config: SubagentConfig | None = None) -> None:
-        super().__init__(agent_type="rules", config=config)
+    def __init__(
+        self,
+        config: SubagentConfig | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(agent_type="rules", config=config, use_cache=use_cache)
 
     def _calculate_confidence(
         self, content: str, state: SubagentState
@@ -516,8 +564,12 @@ class RulesSubagent(BaseSubagent):
 class StateSubagent(BaseSubagent):
     """Subagent for deck composition and state analysis."""
 
-    def __init__(self, config: SubagentConfig | None = None) -> None:
-        super().__init__(agent_type="state", config=config)
+    def __init__(
+        self,
+        config: SubagentConfig | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(agent_type="state", config=config, use_cache=use_cache)
 
     def _calculate_confidence(
         self, content: str, state: SubagentState
@@ -571,8 +623,12 @@ class StateSubagent(BaseSubagent):
 class ActionSpaceSubagent(BaseSubagent):
     """Subagent for card search and filtering."""
 
-    def __init__(self, config: SubagentConfig | None = None) -> None:
-        super().__init__(agent_type="action_space", config=config)
+    def __init__(
+        self,
+        config: SubagentConfig | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(agent_type="action_space", config=config, use_cache=use_cache)
 
     def _calculate_confidence(
         self, content: str, state: SubagentState
@@ -629,8 +685,12 @@ class ActionSpaceSubagent(BaseSubagent):
 class ScenarioSubagent(BaseSubagent):
     """Subagent for scenario analysis and preparation."""
 
-    def __init__(self, config: SubagentConfig | None = None) -> None:
-        super().__init__(agent_type="scenario", config=config)
+    def __init__(
+        self,
+        config: SubagentConfig | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(agent_type="scenario", config=config, use_cache=use_cache)
 
     def _calculate_confidence(
         self, content: str, state: SubagentState

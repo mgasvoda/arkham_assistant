@@ -11,20 +11,6 @@ Subagent Types:
 - scenario: Scenario threats and preparation
 """
 
-from backend.services.subagents.base import (
-    # Base classes and exceptions
-    BaseSubagent,
-    SubagentConfig,
-    SubagentError,
-    SubagentTimeoutError,
-    # Basic implementations
-    RulesSubagent,
-    StateSubagent,
-    ActionSpaceSubagent,
-    ScenarioSubagent,
-    # Factory function
-    create_subagent,
-)
 from backend.services.subagents.action_space_agent import (
     ActionSpaceAgent,
     ActionSpaceQuery,
@@ -32,7 +18,29 @@ from backend.services.subagents.action_space_agent import (
     CardCandidate,
     create_action_space_agent,
 )
-
+from backend.services.subagents.base import (
+    ActionSpaceSubagent,
+    # Base classes and exceptions
+    BaseSubagent,
+    # Basic implementations
+    RulesSubagent,
+    ScenarioSubagent,
+    StateSubagent,
+    SubagentConfig,
+    SubagentError,
+    SubagentTimeoutError,
+    # Factory function
+    create_subagent,
+)
+from backend.services.subagents.cache import (
+    # Caching layer
+    CacheConfig,
+    CacheEntry,
+    CacheMetrics,
+    SubagentCache,
+    get_subagent_cache,
+    reset_subagent_cache,
+)
 from backend.services.subagents.rules_agent import (
     # Enhanced RulesAgent with hybrid retrieval
     RulesAgent,
@@ -64,6 +72,13 @@ __all__ = [
     "RulesQuery",
     "RulesResponse",
     "RulesRetriever",
+    # Caching layer
+    "CacheConfig",
+    "CacheEntry",
+    "CacheMetrics",
+    "SubagentCache",
+    "get_subagent_cache",
+    "reset_subagent_cache",
     # Factory functions
     "create_subagent",
     "create_rules_agent",
