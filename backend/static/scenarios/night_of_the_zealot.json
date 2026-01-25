@@ -1,0 +1,326 @@
+{
+  "campaign": {
+    "id": "notz",
+    "name": "Night of the Zealot",
+    "description": "The core set campaign. Introduces players to Arkham Horror LCG mechanics through three scenarios of escalating difficulty.",
+    "scenarios": ["the_gathering", "the_midnight_masks", "the_devourer_below"]
+  },
+  "scenarios": [
+    {
+      "id": "the_gathering",
+      "name": "The Gathering",
+      "campaign": "Night of the Zealot",
+      "position": 1,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "low",
+      "treachery_profile": {
+        "willpower": 3,
+        "agility": 1,
+        "combat": 1,
+        "intellect": 0
+      },
+      "key_tests": ["willpower", "combat", "intellect"],
+      "mechanics": ["spawn_mechanics", "parleys", "doom"],
+      "enemies": [
+        {
+          "name": "Ghoul Priest",
+          "type": "elite",
+          "fight": 4,
+          "health": 5,
+          "evade": 4,
+          "damage": 2,
+          "horror": 2,
+          "notes": "Boss enemy. Can be parlayed with if Lita is in play. High priority target."
+        },
+        {
+          "name": "Swarm of Rats",
+          "type": "basic",
+          "fight": 1,
+          "health": 1,
+          "evade": 3,
+          "damage": 1,
+          "horror": 0,
+          "notes": "Weak but annoying. Easy to defeat."
+        },
+        {
+          "name": "Ghoul",
+          "type": "basic",
+          "fight": 2,
+          "health": 2,
+          "evade": 2,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Standard enemy. Moderate threat."
+        },
+        {
+          "name": "Ravenous Ghoul",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 3,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Stronger ghoul variant. Hunter keyword."
+        },
+        {
+          "name": "Icy Ghoul",
+          "type": "basic",
+          "fight": 3,
+          "health": 4,
+          "evade": 4,
+          "damage": 2,
+          "horror": 1,
+          "notes": "Toughest basic ghoul. Retaliate keyword."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Rotting Remains",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "horror",
+          "notes": "Core willpower test. Fail = horror damage."
+        },
+        {
+          "name": "Frozen in Fear",
+          "test": "willpower",
+          "difficulty": 3,
+          "effect": "action_loss",
+          "notes": "Attach. Costs actions to discard. High priority."
+        },
+        {
+          "name": "Dissonant Voices",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "play_restriction",
+          "notes": "Cannot play cards until end of round."
+        },
+        {
+          "name": "Crypt Chill",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "discard",
+          "notes": "Discard asset on failure."
+        },
+        {
+          "name": "Obscuring Fog",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "shroud_increase",
+          "notes": "Attach to location. +2 shroud."
+        },
+        {
+          "name": "Ancient Evils",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "doom",
+          "notes": "Add doom to agenda. Cannot be canceled."
+        }
+      ],
+      "tips": [
+        "Prioritize willpower icons for treachery protection",
+        "Bring combat options for the Ghoul Priest boss",
+        "Consider keeping Lita Chantler alive for parley option",
+        "Horror soak is valuable - many treacheries deal horror",
+        "The scenario is forgiving for new players - good for testing decks"
+      ],
+      "difficulty_notes": "Introductory scenario. Low enemy count, straightforward objectives."
+    },
+    {
+      "id": "the_midnight_masks",
+      "name": "The Midnight Masks",
+      "campaign": "Night of the Zealot",
+      "position": 2,
+      "act_count": 1,
+      "agenda_count": 2,
+      "enemy_density": "medium",
+      "treachery_profile": {
+        "willpower": 4,
+        "agility": 2,
+        "combat": 1,
+        "intellect": 1
+      },
+      "key_tests": ["willpower", "intellect", "agility"],
+      "mechanics": ["doom", "resign", "parley", "cultist_hunting"],
+      "enemies": [
+        {
+          "name": "Hunting Nightgaunt",
+          "type": "basic",
+          "fight": 3,
+          "health": 4,
+          "evade": 2,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Retaliate. Moves investigators when evaded."
+        },
+        {
+          "name": "Acolyte",
+          "type": "cultist",
+          "fight": 2,
+          "health": 3,
+          "evade": 2,
+          "damage": 1,
+          "horror": 0,
+          "notes": "Adds doom when spawns. Priority target."
+        },
+        {
+          "name": "Wizard of the Order",
+          "type": "cultist",
+          "fight": 4,
+          "health": 3,
+          "evade": 2,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Elite cultist. Retaliate. Must defeat to interrogate."
+        },
+        {
+          "name": "Masked Hunter",
+          "type": "elite",
+          "fight": 3,
+          "health": 4,
+          "evade": 3,
+          "damage": 2,
+          "horror": 1,
+          "notes": "Aloof. Hunter. One of six unique cultists."
+        },
+        {
+          "name": "Ruth Turner",
+          "type": "elite",
+          "fight": 2,
+          "health": 3,
+          "evade": 4,
+          "damage": 1,
+          "horror": 0,
+          "notes": "Aloof. Hard to pin down. Parley target."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Hunting Shadow",
+          "test": "agility",
+          "difficulty": 4,
+          "effect": "damage",
+          "notes": "Agility test or take damage."
+        },
+        {
+          "name": "False Lead",
+          "test": "intellect",
+          "difficulty": 4,
+          "effect": "clue_loss",
+          "notes": "Lose clues on failure."
+        },
+        {
+          "name": "Locked Door",
+          "test": "none",
+          "difficulty": 0,
+          "effect": "movement_restriction",
+          "notes": "Attach. Costs actions to move."
+        }
+      ],
+      "tips": [
+        "This is a timed scenario - doom pressure is real",
+        "Focus on interrogating cultists efficiently",
+        "Not all cultists need to be found - prioritize based on time",
+        "Movement efficiency matters - locations spread across Arkham",
+        "Consider resign timing - better to escape with some info than none",
+        "Ward of Protection is excellent against doom treacheries",
+        "Cards that provide extra actions help cover ground"
+      ],
+      "difficulty_notes": "Time pressure scenario. Success measured by cultists interrogated. Very replayable."
+    },
+    {
+      "id": "the_devourer_below",
+      "name": "The Devourer Below",
+      "campaign": "Night of the Zealot",
+      "position": 3,
+      "act_count": 3,
+      "agenda_count": 3,
+      "enemy_density": "high",
+      "treachery_profile": {
+        "willpower": 5,
+        "agility": 2,
+        "combat": 3,
+        "intellect": 1
+      },
+      "key_tests": ["willpower", "combat", "agility"],
+      "mechanics": ["doom", "vengeance", "ancient_one", "ritual_sites"],
+      "enemies": [
+        {
+          "name": "Umordhoth",
+          "type": "ancient_one",
+          "fight": 5,
+          "health": 10,
+          "evade": 6,
+          "damage": 3,
+          "horror": 3,
+          "notes": "Final boss. Massive. Consider alternate win conditions."
+        },
+        {
+          "name": "Goat Spawn",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 4,
+          "damage": 1,
+          "horror": 1,
+          "notes": "Spawns at ritual sites."
+        },
+        {
+          "name": "Young Deep One",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 3,
+          "damage": 2,
+          "horror": 1,
+          "notes": "Hunter. Solid threat."
+        },
+        {
+          "name": "Yithian Observer",
+          "type": "basic",
+          "fight": 3,
+          "health": 3,
+          "evade": 2,
+          "damage": 1,
+          "horror": 2,
+          "notes": "Forces horror on attacks."
+        }
+      ],
+      "treacheries": [
+        {
+          "name": "Grasping Hands",
+          "test": "agility",
+          "difficulty": 3,
+          "effect": "damage",
+          "notes": "Fail = damage equal to failure amount."
+        },
+        {
+          "name": "Offer of Power",
+          "test": "willpower",
+          "difficulty": 5,
+          "effect": "doom",
+          "notes": "High difficulty. Adds doom on failure."
+        },
+        {
+          "name": "Dreams of R'lyeh",
+          "test": "willpower",
+          "difficulty": 4,
+          "effect": "horror",
+          "notes": "Horror damage. Discard cards from hand on failure."
+        }
+      ],
+      "tips": [
+        "This is the hardest scenario in the campaign",
+        "Strong willpower is essential - multiple high-difficulty tests",
+        "Combat capability needed for the boss encounter",
+        "Horror protection is critical - many sources of horror",
+        "Consider bringing damage assets that can scale (Dynamite, etc.)",
+        "Alternative win condition exists - may not need to defeat Umordhoth",
+        "Managing doom is crucial - vengeance enemies accelerate agenda",
+        "Bring soak (allies, armor) for the brutal encounter deck"
+      ],
+      "difficulty_notes": "Campaign finale. High difficulty spike. Boss has multiple paths to resolution."
+    }
+  ]
+}
