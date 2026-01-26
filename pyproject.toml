@@ -50,3 +50,8 @@ members = [
     "backend",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]
+
