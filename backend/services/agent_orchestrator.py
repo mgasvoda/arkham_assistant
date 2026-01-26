@@ -1,27 +1,32 @@
-"""AI agent orchestration with LLM."""
+"""AI agent orchestration with LLM.
 
-from typing import Optional
+This module provides the main entry point for chat message processing.
+It delegates to the orchestrator module for the actual implementation.
 
+This file is kept for backward compatibility with existing imports.
+"""
 
-def process_chat_message(
-    message: str,
-    deck_id: Optional[str] = None,
-    context: Optional[list[dict]] = None,
-) -> dict:
-    """Process a chat message through the AI agent.
+from typing import Any, Optional
 
-    Args:
-        message: User message
-        deck_id: Optional deck context
-        context: Optional conversation history
+from backend.services.orchestrator import (
+    Orchestrator,
+    OrchestratorConfig,
+    OrchestratorRequest,
+    OrchestratorResponse,
+    SubagentResult,
+    SubagentType,
+    create_orchestrator,
+    process_chat_message,
+)
 
-    Returns:
-        Dictionary with reply, structured data, and tool calls
-    """
-    # TODO: Implement LLM orchestration with tool calling
-    return {
-        "reply": "AI agent not yet implemented",
-        "structured_data": None,
-        "tool_calls": [],
-    }
-
+# Re-export for backward compatibility
+__all__ = [
+    "Orchestrator",
+    "OrchestratorConfig",
+    "OrchestratorRequest",
+    "OrchestratorResponse",
+    "SubagentResult",
+    "SubagentType",
+    "create_orchestrator",
+    "process_chat_message",
+]
