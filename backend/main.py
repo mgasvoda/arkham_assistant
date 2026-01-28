@@ -1,15 +1,34 @@
 """Main FastAPI application entry point."""
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.api import cards, characters, chat, decks, sim
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Arkham Assistant API",
     description="Backend API for Arkham Horror LCG deckbuilding assistant",
     version="0.1.0",
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected exceptions globally.
+
+    Logs the error and returns a 500 response with a generic message.
+    This catches any unhandled exceptions that slip through endpoint handlers.
+    """
+    logger.error(f"Unhandled exception for {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
 
 # CORS middleware for local frontend development
 app.add_middleware(
