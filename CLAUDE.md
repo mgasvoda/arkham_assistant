@@ -54,3 +54,36 @@
 - **Playwright** for E2E tests with console error detection
 - E2E tests MUST verify no console errors
 - Run: `npm run test` (unit), `npm run test:e2e` (E2E)
+
+### Manual API Testing
+For testing API endpoints locally:
+
+1. **Start the backend server** (in separate terminal or background):
+   ```bash
+   uv run uvicorn backend.main:app --reload
+   ```
+
+2. **Populate ChromaDB with test data** (required for card/investigator queries):
+   ```bash
+   uv run python scripts/fetch_arkhamdb.py --pack core
+   ```
+
+3. **Test endpoints with curl**:
+   ```bash
+   # Health check
+   curl -s http://localhost:8000/health
+
+   # Q&A request
+   curl -X POST http://localhost:8000/chat/ \
+     -H "Content-Type: application/json" \
+     -d '{"message": "What cards can Roland Banks include?"}'
+
+   # Deck building request
+   curl -X POST http://localhost:8000/chat/ \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Build me a combat deck", "investigator_id": "01001", "investigator_name": "Roland Banks"}'
+   ```
+
+4. **View API docs**: http://localhost:8000/docs
+
+Note: The trailing slash on `/chat/` is required (FastAPI redirects without it). The user must first populate a .env with the OPENAI API KEY
