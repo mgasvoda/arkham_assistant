@@ -275,7 +275,7 @@ class ActionSpaceAgent:
             rules.special_rules = investigator.get("deck_requirements", "")
 
             # Parse faction/class from investigator data
-            faction = investigator.get("faction_name") or investigator.get("class_name", "")
+            faction = investigator.get("faction_name") or investigator.get("class") or investigator.get("class_name", "")
             if faction:
                 rules.class_access[faction] = 5  # Full access to primary class
                 rules.class_access["Neutral"] = 5  # All have neutral access
@@ -319,8 +319,8 @@ class ActionSpaceAgent:
             True if the card is legal, False otherwise.
         """
         # Get card's class and level
-        card_class = card.get("class_name") or card.get("faction_name", "")
-        card_level = card.get("xp") or card.get("level", 0)
+        card_class = card.get("class") or card.get("class_name") or card.get("faction_name", "")
+        card_level = card.get("xp_cost") or card.get("xp") or card.get("level", 0)
 
         # Handle missing/invalid level
         if card_level is None:
@@ -575,11 +575,11 @@ class ActionSpaceAgent:
             candidate = CardCandidate(
                 card_id=card_id,
                 name=card.get("name", "Unknown"),
-                xp_cost=card.get("xp", 0) or 0,
+                xp_cost=card.get("xp_cost") or card.get("xp", 0) or 0,
                 relevance_score=relevance_score,
                 reason=reason,
-                card_type=card.get("type_name"),
-                class_name=card.get("class_name"),
+                card_type=card.get("type") or card.get("type_name"),
+                class_name=card.get("class") or card.get("class_name"),
                 cost=card.get("cost"),
                 traits=card.get("traits"),
                 text=card.get("text"),
