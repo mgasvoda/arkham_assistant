@@ -123,10 +123,6 @@ def run_simulation_tool(deck_id: str, n_trials: int = 1000) -> dict:
     This tool runs Monte Carlo simulations to analyze deck performance,
     including draw consistency, resource curves, and key card timing.
 
-    Note: This function is a stub and will be implemented in a later ticket.
-    The simulator service (backend/services/simulator.py) needs to be
-    completed first.
-
     Args:
         deck_id: ID of deck to simulate
         n_trials: Number of simulation trials (default 1000)
@@ -140,13 +136,16 @@ def run_simulation_tool(deck_id: str, n_trials: int = 1000) -> dict:
         - resource_efficiency: Resource utilization score
         - key_card_reliability: Consistency of key card draws
     """
-    # TODO: Implement in ticket [1.4] - Deck Simulator
-    # Will delegate to: from backend.services.simulator import run_simulation
-    return {
-        "error": "Simulation not yet implemented",
-        "deck_id": deck_id,
-        "n_trials": n_trials,
-    }
+    from backend.services.simulator import run_simulation
+
+    try:
+        return run_simulation(
+            deck_id=deck_id,
+            n_trials=n_trials,
+            config={"mulligan_strategy": "aggressive"},
+        )
+    except Exception as e:
+        return {"error": str(e), "deck_id": deck_id}
 
 
 def get_static_info(topic: str) -> str:
@@ -446,9 +445,9 @@ def deck_summary_tool(deck_id: str) -> str:
 def simulation_tool(deck_id: str, n_trials: int = 1000) -> str:
     """Run Monte Carlo simulations to analyze deck performance.
 
-    Note: This tool is not yet implemented and will return a placeholder response.
-    When implemented, it will provide metrics like draw consistency, resource
-    curves, and key card timing.
+    Executes multiple random trials to analyze opening hand consistency,
+    mulligan effectiveness, and key card reliability. Returns metrics like
+    average setup time, success rate, and per-card statistics.
     """
     result = run_simulation_tool(deck_id, n_trials)
     return json.dumps(result, indent=2)
@@ -486,11 +485,11 @@ IMPLEMENTED_TOOLS = [
     deck_lookup_tool,
     static_info_tool,
     deck_summary_tool,
+    simulation_tool,
 ]
 
 # Stub tools (placeholders for future implementation)
 STUB_TOOLS = [
-    simulation_tool,
     recommendation_tool,
 ]
 

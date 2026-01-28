@@ -271,15 +271,15 @@ class TestGetStaticInfo:
 
 
 class TestRunSimulationTool:
-    """Tests for run_simulation_tool function (stub)."""
+    """Tests for run_simulation_tool function."""
 
-    def test_returns_stub_response(self):
-        """Should return stub response indicating not implemented."""
+    def test_returns_error_for_missing_deck(self):
+        """Should return error when deck not found."""
         result = run_simulation_tool("deck_123", n_trials=500)
 
-        assert result["error"] == "Simulation not yet implemented"
+        # Should return error since deck doesn't exist
+        assert "error" in result
         assert result["deck_id"] == "deck_123"
-        assert result["n_trials"] == 500
 
 
 # ============================================================================
@@ -559,14 +559,15 @@ class TestDeckSummaryTool:
 
 
 class TestSimulationTool:
-    """Tests for simulation_tool LangGraph wrapper (stub)."""
+    """Tests for simulation_tool LangGraph wrapper."""
 
-    def test_returns_stub_json(self):
-        """Should return stub response as JSON."""
+    def test_returns_error_for_missing_deck(self):
+        """Should return error when deck not found."""
         result = simulation_tool.invoke({"deck_id": "deck_123", "n_trials": 100})
 
         parsed = json.loads(result)
-        assert parsed["error"] == "Simulation not yet implemented"
+        # Should return error since deck doesn't exist
+        assert "error" in parsed
 
     def test_tool_has_correct_name(self):
         """Should have correct tool name."""
@@ -608,19 +609,19 @@ class TestToolRegistry:
         assert "recommend_cards" in tool_names
 
     def test_implemented_tools_list(self):
-        """Should contain 4 implemented tools."""
-        assert len(IMPLEMENTED_TOOLS) == 4
+        """Should contain 5 implemented tools."""
+        assert len(IMPLEMENTED_TOOLS) == 5
         tool_names = [t.name for t in IMPLEMENTED_TOOLS]
         assert "card_lookup" in tool_names
         assert "deck_lookup" in tool_names
         assert "static_info" in tool_names
         assert "deck_summary" in tool_names
+        assert "run_simulation" in tool_names
 
     def test_stub_tools_list(self):
-        """Should contain 2 stub tools."""
-        assert len(STUB_TOOLS) == 2
+        """Should contain 1 stub tool."""
+        assert len(STUB_TOOLS) == 1
         tool_names = [t.name for t in STUB_TOOLS]
-        assert "run_simulation" in tool_names
         assert "recommend_cards" in tool_names
 
     def test_all_tools_are_langchain_tools(self):
