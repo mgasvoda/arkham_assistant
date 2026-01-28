@@ -33,6 +33,7 @@ from backend.models.subagent_models import SubagentResponse
 from backend.services.llm_config import get_llm_config
 from backend.services.subagents import (
     ActionSpaceQuery,
+    StateQuery,
     SubagentConfig,
     create_action_space_agent,
     create_rules_agent,
@@ -611,11 +612,14 @@ Keep the response focused and concise while being comprehensive."""
             if agent_type == SubagentType.RULES:
                 response = subagent.query(query, context)
             elif agent_type == SubagentType.STATE:
-                # StateAgent needs deck_cards in context
-                state_context = dict(context)
-                if request.deck_cards:
-                    state_context["deck_cards"] = request.deck_cards
-                response = subagent.query(query, state_context)
+                # StateAgent uses analyze() with StateQuery
+                card_list = request.deck_cards if request.deck_cards else []
+                state_query = StateQuery(
+                    card_list=card_list,
+                    investigator_id=request.investigator_id or "",
+                    upgrade_points=request.upgrade_xp or 0,
+                )
+                response = subagent.analyze(state_query)
             elif agent_type == SubagentType.ACTION_SPACE:
                 # ActionSpaceAgent needs specific context
                 action_context = dict(context)
@@ -1385,15 +1389,14 @@ Respond in this exact JSON format:
                 for _ in range(card.quantity):
                     card_list.append(card.card_id)
 
-            # Note: StateAgent.query takes string + context, not StateQuery directly
+            # StateAgent uses analyze() with StateQuery
             inv_id = state.constraints.investigator_id if state.constraints else ""
-            response = state_agent.query(
-                "Analyze this deck for gaps and issues",
-                {
-                    "deck_cards": card_list,
-                    "investigator_id": inv_id,
-                },
+            state_query = StateQuery(
+                card_list=card_list,
+                investigator_id=inv_id,
+                upgrade_points=0,
             )
+            response = state_agent.analyze(state_query)
 
             # Extract gaps from response
             if hasattr(response, "identified_gaps") and response.identified_gaps:
