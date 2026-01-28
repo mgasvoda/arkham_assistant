@@ -1689,8 +1689,18 @@ def process_chat_message(
     orchestrator = create_orchestrator()
     response = orchestrator.process(request)
 
+    # Handle both OrchestratorResponse and NewDeckResponse
+    if isinstance(response, NewDeckResponse):
+        # For deck building, use deck_name as the reply summary
+        reply = f"{response.deck_name}: {response.reasoning}"
+        agents_consulted = [r.agent_type for r in response.subagent_results]
+    else:
+        # For Q&A responses
+        reply = response.content
+        agents_consulted = response.agents_consulted
+
     return {
-        "reply": response.content,
+        "reply": reply,
         "structured_data": response.model_dump(),
-        "agents_consulted": response.agents_consulted,
+        "agents_consulted": agents_consulted,
     }
