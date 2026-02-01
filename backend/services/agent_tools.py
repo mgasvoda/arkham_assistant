@@ -10,18 +10,18 @@ This module provides both:
 
 import json
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from backend.models.deck_builder_models import DeckSummary, Recommendation
 from backend.services.chroma_client import ChromaClient
 from backend.services.subagents.utils import CardDataLoader
 
-
 # Module-level instances (lazy initialization)
-_chroma_client: Optional[ChromaClient] = None
-_card_loader: Optional[CardDataLoader] = None
+_chroma_client: ChromaClient | None = None
+_card_loader: CardDataLoader | None = None
 
 
 def _get_client() -> ChromaClient:
@@ -199,14 +199,12 @@ def get_static_info(topic: str) -> str:
     return file_path.read_text(encoding="utf-8")
 
 
-def recommend_cards(deck_id: str, goal: str = "balance") -> list[dict]:
-    """LLM-driven analysis of deck composition with card recommendations.
+def recommend_cards(deck_id: str, goal: str = "balance") -> list[Recommendation]:
+    """Analyze deck composition and suggest card recommendations.
 
-    This tool analyzes a deck's composition and suggests cards to add or
-    remove based on the specified optimization goal.
-
-    Note: This function is a stub and will be implemented in a later ticket.
-    Requires LLM integration for intelligent card recommendations.
+    This function analyzes a deck's composition and suggests cards to add or
+    remove based on the specified optimization goal. It examines the current
+    deck structure and identifies gaps or improvements.
 
     Args:
         deck_id: ID of deck to analyze
@@ -218,16 +216,106 @@ def recommend_cards(deck_id: str, goal: str = "balance") -> list[dict]:
             - "clues": Improved investigation efficiency
 
     Returns:
-        List of recommendation dictionaries, each containing:
-        - card_id: Recommended card ID
-        - card_name: Card name
-        - action: "add" or "remove"
-        - reason: Explanation for the recommendation
-        - priority: 1-5 importance rating
+        List of Recommendation objects with suggested changes.
+
+    Raises:
+        DeckNotFoundError: If the deck is not found
     """
-    # TODO: Implement in ticket [1.5] - Agent Orchestrator
-    # Will use LLM analysis with deck context
-    return []
+    # Get deck and analyze its composition
+    # Validate deck exists (raises DeckNotFoundError if not)
+    get_deck(deck_id)
+    summary = summarize_deck(deck_id)
+
+    recommendations: list[Recommendation] = []
+    type_dist = summary.get("type_breakdown", {})
+    total = summary.get("total_cards", 0)
+
+    if total == 0:
+        return recommendations
+
+    # Calculate ratios
+    asset_count = type_dist.get("Asset", 0)
+    event_count = type_dist.get("Event", 0)
+    skill_count = type_dist.get("Skill", 0)
+
+    # Goal-specific analysis
+    if goal == "card_draw":
+        # Check if deck has enough draw
+        if asset_count < total * 0.4:
+            recommendations.append(Recommendation(
+                action="add",
+                card_id="01035",  # Lucky Cigarette Case (placeholder)
+                card_name="Card Draw Asset",
+                xp_cost=0,
+                priority=1,
+                reason="Deck lacks consistent card draw - add draw engine"
+            ))
+
+    elif goal == "economy":
+        # Check resource curve
+        curve = summary.get("curve", {})
+        high_cost = sum(
+            count for cost, count in curve.items()
+            if cost.isdigit() and int(cost) >= 3
+        )
+        if high_cost > total * 0.4:
+            recommendations.append(Recommendation(
+                action="add",
+                card_id="01073",  # Emergency Cache (placeholder)
+                card_name="Resource Generator",
+                xp_cost=0,
+                priority=1,
+                reason="High cost curve - add resource generation"
+            ))
+
+    elif goal == "combat":
+        # Check for combat assets
+        if asset_count < total * 0.3:
+            recommendations.append(Recommendation(
+                action="add",
+                card_id="01016",  # Machete
+                card_name="Combat Weapon",
+                xp_cost=0,
+                priority=1,
+                reason="Deck needs more combat options"
+            ))
+
+    elif goal == "clues":
+        # Check for investigation tools
+        if asset_count < total * 0.3:
+            recommendations.append(Recommendation(
+                action="add",
+                card_id="01036",  # Magnifying Glass
+                card_name="Investigation Tool",
+                xp_cost=0,
+                priority=1,
+                reason="Deck needs more investigation tools"
+            ))
+
+    else:  # balance
+        # General balance recommendations
+        if skill_count < total * 0.15:
+            recommendations.append(Recommendation(
+                action="add",
+                card_id="01000",
+                card_name="Skill Card",
+                xp_cost=0,
+                priority=2,
+                reason="Low skill card count - add defensive skills"
+            ))
+        if event_count > total * 0.5:
+            recommendations.append(Recommendation(
+                action="swap",
+                card_id="01000",
+                card_name="Asset",
+                remove_card_id="01000",
+                remove_card_name="Event",
+                xp_cost=0,
+                priority=3,
+                reason="Too many events - consider more permanent assets"
+            ))
+
+    return recommendations
 
 
 def summarize_deck(deck_id: str) -> dict:
@@ -248,6 +336,7 @@ def summarize_deck(deck_id: str) -> dict:
         - class_distribution: Dict mapping class -> count
         - type_breakdown: Dict mapping card type -> count
         - archetype: Deck archetype (if set)
+        - key_cards: List of important cards (XP cards, core assets)
 
     Raises:
         DeckNotFoundError: If the deck is not found
@@ -264,6 +353,7 @@ def summarize_deck(deck_id: str) -> dict:
         "class_distribution": {},  # class -> count
         "type_breakdown": {},  # type -> count
         "archetype": deck.get("archetype"),
+        "key_cards": [],  # Important cards
     }
 
     # Get card list from deck
@@ -282,12 +372,16 @@ def summarize_deck(deck_id: str) -> dict:
     loader = _get_card_loader()
     card_counts = loader.normalize_card_input(cards_data)
 
+    # Track cards for key_cards selection
+    card_details: list[tuple[str, dict, int]] = []
+
     # Fetch card details (don't fail on missing cards)
     for card_id, count in card_counts.items():
         card = _get_client().get_card(card_id)
         if card is None:
             continue
 
+        card_details.append((card_id, card, count))
         summary["total_cards"] += count
 
         # Resource curve (by cost)
@@ -308,7 +402,47 @@ def summarize_deck(deck_id: str) -> dict:
             summary["type_breakdown"].get(card_type, 0) + count
         )
 
+    # Identify key cards (XP cards, unique assets, signature cards)
+    key_cards: list[str] = []
+    for card_id, card, count in card_details:
+        xp = card.get("xp", 0) or 0
+        card_name = card.get("name", card_id)
+        is_unique = card.get("is_unique", False)
+        is_permanent = "Permanent" in str(card.get("traits", ""))
+
+        # Key card criteria: XP > 0, unique, or permanent
+        if xp > 0 or is_unique or is_permanent:
+            key_cards.append(card_name)
+
+    # Limit to top 5 key cards
+    summary["key_cards"] = key_cards[:5]
+
     return summary
+
+
+def get_deck_summary_model(deck_id: str) -> DeckSummary:
+    """Generate a DeckSummary Pydantic model for a deck.
+
+    This is a convenience wrapper around summarize_deck that returns
+    a properly typed DeckSummary model instead of a dict.
+
+    Args:
+        deck_id: ID of deck to summarize
+
+    Returns:
+        DeckSummary model with deck composition analysis.
+
+    Raises:
+        DeckNotFoundError: If the deck is not found
+    """
+    summary = summarize_deck(deck_id)
+    return DeckSummary(
+        card_count=summary.get("total_cards", 0),
+        curve=summary.get("curve", {}),
+        type_distribution=summary.get("type_breakdown", {}),
+        class_distribution=summary.get("class_distribution", {}),
+        key_cards=summary.get("key_cards", []),
+    )
 
 
 # =============================================================================
@@ -455,14 +589,18 @@ def simulation_tool(deck_id: str, n_trials: int = 1000) -> str:
 
 @tool("recommend_cards", args_schema=RecommendationInput)
 def recommendation_tool(deck_id: str, goal: str = "balance") -> str:
-    """Get AI-powered card recommendations for improving a deck.
+    """Get card recommendations for improving a deck.
 
-    Note: This tool is not yet implemented and will return an empty list.
-    When implemented, it will suggest cards to add or remove based on the
-    specified optimization goal.
+    Analyzes deck composition and suggests cards to add, remove, swap,
+    or upgrade based on the specified optimization goal.
     """
-    result = recommend_cards(deck_id, goal)
-    return json.dumps(result, indent=2)
+    try:
+        recommendations = recommend_cards(deck_id, goal)
+        # Serialize Recommendation models to dicts for JSON output
+        result = [rec.model_dump() for rec in recommendations]
+        return json.dumps(result, indent=2)
+    except DeckNotFoundError as e:
+        return json.dumps({"error": str(e)})
 
 
 # =============================================================================
@@ -486,10 +624,10 @@ IMPLEMENTED_TOOLS = [
     static_info_tool,
     deck_summary_tool,
     simulation_tool,
+    recommendation_tool,
 ]
 
 # Stub tools (placeholders for future implementation)
-STUB_TOOLS = [
-    recommendation_tool,
+STUB_TOOLS: list = [
 ]
 

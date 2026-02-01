@@ -288,13 +288,27 @@ class TestRunSimulationTool:
 
 
 class TestRecommendCards:
-    """Tests for recommend_cards function (stub)."""
+    """Tests for recommend_cards function."""
 
-    def test_returns_empty_list_stub(self):
-        """Should return empty list as stub implementation."""
-        result = recommend_cards("deck_123", goal="combat")
+    def test_returns_recommendations_list(self, mock_chroma_client, sample_deck_data):
+        """Should return list of Recommendation objects."""
+        from backend.models.deck_builder_models import Recommendation
 
-        assert result == []
+        mock_chroma_client.get_deck.return_value = sample_deck_data.copy()
+        mock_chroma_client.get_card.return_value = None
+
+        result = recommend_cards("deck_123", goal="balance")
+
+        assert isinstance(result, list)
+        for rec in result:
+            assert isinstance(rec, Recommendation)
+
+    def test_raises_on_missing_deck(self, mock_chroma_client):
+        """Should raise DeckNotFoundError for missing deck."""
+        mock_chroma_client.get_deck.side_effect = DeckNotFoundError("Deck not found")
+
+        with pytest.raises(DeckNotFoundError):
+            recommend_cards("nonexistent_deck", goal="combat")
 
 
 # ============================================================================
@@ -575,14 +589,26 @@ class TestSimulationTool:
 
 
 class TestRecommendationTool:
-    """Tests for recommendation_tool LangGraph wrapper (stub)."""
+    """Tests for recommendation_tool LangGraph wrapper."""
 
-    def test_returns_empty_list_json(self):
-        """Should return empty list as JSON."""
-        result = recommendation_tool.invoke({"deck_id": "deck_123", "goal": "combat"})
+    def test_returns_recommendations_json(self, mock_chroma_client, sample_deck_data):
+        """Should return recommendations as JSON array."""
+        mock_chroma_client.get_deck.return_value = sample_deck_data.copy()
+        mock_chroma_client.get_card.return_value = None
+
+        result = recommendation_tool.invoke({"deck_id": "deck_123", "goal": "balance"})
 
         parsed = json.loads(result)
-        assert parsed == []
+        assert isinstance(parsed, list)
+
+    def test_returns_error_on_missing_deck(self, mock_chroma_client):
+        """Should return error JSON for missing deck."""
+        mock_chroma_client.get_deck.side_effect = DeckNotFoundError("Deck not found: test")
+
+        result = recommendation_tool.invoke({"deck_id": "test", "goal": "combat"})
+
+        parsed = json.loads(result)
+        assert "error" in parsed
 
     def test_tool_has_correct_name(self):
         """Should have correct tool name."""
@@ -609,20 +635,19 @@ class TestToolRegistry:
         assert "recommend_cards" in tool_names
 
     def test_implemented_tools_list(self):
-        """Should contain 5 implemented tools."""
-        assert len(IMPLEMENTED_TOOLS) == 5
+        """Should contain 6 implemented tools."""
+        assert len(IMPLEMENTED_TOOLS) == 6
         tool_names = [t.name for t in IMPLEMENTED_TOOLS]
         assert "card_lookup" in tool_names
         assert "deck_lookup" in tool_names
         assert "static_info" in tool_names
         assert "deck_summary" in tool_names
         assert "run_simulation" in tool_names
+        assert "recommend_cards" in tool_names
 
     def test_stub_tools_list(self):
-        """Should contain 1 stub tool."""
-        assert len(STUB_TOOLS) == 1
-        tool_names = [t.name for t in STUB_TOOLS]
-        assert "recommend_cards" in tool_names
+        """Should contain 0 stub tools."""
+        assert len(STUB_TOOLS) == 0
 
     def test_all_tools_are_langchain_tools(self):
         """All tools should be valid LangChain tools."""

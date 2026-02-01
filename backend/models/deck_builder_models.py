@@ -7,9 +7,137 @@ and the final deck response.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+class DeckSummary(BaseModel):
+    """Summary of a deck's composition and structure.
+
+    Provides high-level metrics about a deck for analysis and comparison.
+
+    Attributes:
+        card_count: Total number of cards in the deck.
+        curve: Resource cost distribution (cost -> count).
+        type_distribution: Card types breakdown (Asset, Event, Skill -> count).
+        class_distribution: Faction distribution (Guardian, Seeker, etc -> count).
+        key_cards: Important cards that define the deck's strategy.
+    """
+
+    card_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of cards in the deck"
+    )
+    curve: dict[str, int] = Field(
+        default_factory=dict,
+        description="Resource cost distribution (cost -> count)"
+    )
+    type_distribution: dict[str, int] = Field(
+        default_factory=dict,
+        description="Card type breakdown (Asset, Event, Skill -> count)"
+    )
+    class_distribution: dict[str, int] = Field(
+        default_factory=dict,
+        description="Faction distribution (Guardian, Seeker, etc -> count)"
+    )
+    key_cards: list[str] = Field(
+        default_factory=list,
+        description="Important cards that define the deck's strategy"
+    )
+
+    def to_readable(self) -> str:
+        """Format the summary as human-readable text.
+
+        Returns:
+            Multi-line string describing the deck composition.
+        """
+        lines = [f"**Card Count**: {self.card_count}"]
+
+        if self.curve:
+            curve_str = ", ".join(f"{k}: {v}" for k, v in sorted(self.curve.items()))
+            lines.append(f"**Resource Curve**: {curve_str}")
+
+        if self.type_distribution:
+            type_str = ", ".join(f"{k}: {v}" for k, v in self.type_distribution.items())
+            lines.append(f"**Types**: {type_str}")
+
+        if self.class_distribution:
+            class_str = ", ".join(f"{k}: {v}" for k, v in self.class_distribution.items())
+            lines.append(f"**Classes**: {class_str}")
+
+        if self.key_cards:
+            lines.append(f"**Key Cards**: {', '.join(self.key_cards)}")
+
+        return "\n".join(lines)
+
+
+class Recommendation(BaseModel):
+    """A single card recommendation for deck modification.
+
+    Represents an action to take on a deck, such as adding a card,
+    removing one, swapping cards, or upgrading to a higher-level version.
+
+    Attributes:
+        action: The type of modification (add, remove, swap, upgrade).
+        card_id: ID of the card to add or upgrade to.
+        card_name: Display name of the card.
+        remove_card_id: ID of the card to remove (for swap/upgrade).
+        remove_card_name: Name of the card to remove (for swap/upgrade).
+        xp_cost: Experience points required for this change.
+        priority: Importance ranking (1 = highest priority).
+        reason: Explanation for this recommendation.
+    """
+
+    action: Literal["add", "remove", "swap", "upgrade"] = Field(
+        description="Type of deck modification"
+    )
+    card_id: str = Field(description="Card ID to add or upgrade to")
+    card_name: str = Field(description="Display name of the card")
+    remove_card_id: str | None = Field(
+        default=None,
+        description="Card ID to remove (for swap/upgrade actions)"
+    )
+    remove_card_name: str | None = Field(
+        default=None,
+        description="Card name to remove (for swap/upgrade actions)"
+    )
+    xp_cost: int = Field(
+        default=0,
+        ge=0,
+        description="Experience points required"
+    )
+    priority: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Importance ranking (1 = highest)"
+    )
+    reason: str = Field(description="Explanation for this recommendation")
+
+    def to_readable(self) -> str:
+        """Format the recommendation as human-readable text.
+
+        Returns:
+            String describing the recommendation action.
+        """
+        if self.action == "add":
+            result = f"Add **{self.card_name}**"
+        elif self.action == "remove":
+            result = f"Remove **{self.card_name}**"
+        elif self.action == "swap":
+            result = f"Swap **{self.remove_card_name}** → **{self.card_name}**"
+        elif self.action == "upgrade":
+            result = f"Upgrade **{self.remove_card_name}** → **{self.card_name}**"
+        else:
+            result = f"{self.action}: {self.card_name}"
+
+        if self.xp_cost > 0:
+            result += f" ({self.xp_cost} XP)"
+
+        result += f" - {self.reason}"
+        return result
 
 
 class CardSelection(BaseModel):
@@ -214,4 +342,166 @@ class NewDeckResponse(BaseModel):
             warnings=[error_message],
             confidence=0.0,
             metadata={"error": True},
+        )
+
+    def to_readable(self) -> str:
+        """Format the deck response as human-readable text.
+
+        Returns:
+            Multi-line string describing the deck.
+        """
+        lines = [
+            f"# {self.deck_name}",
+            f"**Investigator**: {self.investigator_name}",
+            f"**Archetype**: {self.archetype}",
+            f"**Total Cards**: {self.total_cards}",
+            "",
+            "## Strategy",
+            self.reasoning,
+            "",
+            "## Card List",
+        ]
+
+        # Group cards by category
+        by_category: dict[str, list[CardSelection]] = {}
+        for card in self.cards:
+            by_category.setdefault(card.category, []).append(card)
+
+        for category, cards in by_category.items():
+            lines.append(f"\n### {category.title()}")
+            for card in cards:
+                lines.append(f"- {card.name} x{card.quantity} - {card.reason}")
+
+        if self.warnings:
+            lines.append("\n## Warnings")
+            for warning in self.warnings:
+                lines.append(f"- {warning}")
+
+        return "\n".join(lines)
+
+
+class DeckRecommendationResponse(BaseModel):
+    """Unified response for deck recommendations (new deck or upgrade).
+
+    This schema handles both new deck creation and upgrade recommendations,
+    providing a consistent structure for the API response.
+
+    Attributes:
+        investigator_id: ID of the investigator this recommendation is for.
+        request_type: Whether this is a new deck or upgrade recommendation.
+        original_message: The user's original request message.
+        current_deck_summary: Summary of the existing deck (for upgrades).
+        proposed_deck_summary: Summary of the deck after changes.
+        recommendations: List of individual card recommendations.
+        reasoning: High-level explanation of the recommendation strategy.
+        subagents_consulted: Which AI agents contributed to this response.
+        confidence_score: Overall confidence in the recommendations (0-1).
+        warnings: Any concerns or caveats about the recommendations.
+    """
+
+    investigator_id: str = Field(description="Investigator ID")
+    request_type: Literal["new_deck", "upgrade"] = Field(
+        description="Type of recommendation request"
+    )
+    original_message: str = Field(description="The user's original request")
+    current_deck_summary: DeckSummary | None = Field(
+        default=None,
+        description="Summary of existing deck (for upgrades)"
+    )
+    proposed_deck_summary: DeckSummary = Field(
+        description="Summary of deck after applying recommendations"
+    )
+    recommendations: list[Recommendation] = Field(
+        default_factory=list,
+        description="Individual card recommendations"
+    )
+    reasoning: str = Field(
+        default="",
+        description="High-level explanation of recommendation strategy"
+    )
+    subagents_consulted: list[str] = Field(
+        default_factory=list,
+        description="AI agents that contributed to this response"
+    )
+    confidence_score: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence in recommendations"
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Concerns or caveats about recommendations"
+    )
+
+    def to_readable(self) -> str:
+        """Format the recommendations as human-readable text.
+
+        Returns:
+            Multi-line string describing the recommendations.
+        """
+        lines = [
+            "# Deck Recommendations",
+            f"**Request Type**: {self.request_type.replace('_', ' ').title()}",
+            "",
+            "## Strategy",
+            self.reasoning,
+            "",
+        ]
+
+        if self.recommendations:
+            lines.append("## Recommendations")
+            # Sort by priority
+            sorted_recs = sorted(self.recommendations, key=lambda r: r.priority)
+            for i, rec in enumerate(sorted_recs, 1):
+                lines.append(f"{i}. {rec.to_readable()}")
+            lines.append("")
+
+        total_xp = sum(r.xp_cost for r in self.recommendations)
+        if total_xp > 0:
+            lines.append(f"**Total XP Cost**: {total_xp}")
+
+        if self.current_deck_summary:
+            lines.append("\n## Current Deck")
+            lines.append(self.current_deck_summary.to_readable())
+
+        lines.append("\n## After Changes")
+        lines.append(self.proposed_deck_summary.to_readable())
+
+        if self.warnings:
+            lines.append("\n## Warnings")
+            for warning in self.warnings:
+                lines.append(f"- {warning}")
+
+        lines.append(f"\n**Confidence**: {self.confidence_score:.0%}")
+
+        return "\n".join(lines)
+
+    @classmethod
+    def error_response(
+        cls,
+        error_message: str,
+        investigator_id: str = "",
+        original_message: str = "",
+    ) -> DeckRecommendationResponse:
+        """Create an error response for failed recommendations.
+
+        Args:
+            error_message: Description of the error.
+            investigator_id: The investigator ID if known.
+            original_message: The user's original message.
+
+        Returns:
+            DeckRecommendationResponse indicating an error occurred.
+        """
+        return cls(
+            investigator_id=investigator_id,
+            request_type="new_deck",
+            original_message=original_message,
+            proposed_deck_summary=DeckSummary(),
+            recommendations=[],
+            reasoning=error_message,
+            subagents_consulted=[],
+            confidence_score=0.0,
+            warnings=[error_message],
         )
