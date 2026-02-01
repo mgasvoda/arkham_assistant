@@ -7,14 +7,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.models.simulation_models import (
+    HandQualityBreakdown,
     KeyCardStats,
     MulliganStrategy,
 )
 from backend.services.simulator import (
+    _calculate_hand_cost,
+    _calculate_hand_quality,
     _calculate_setup_time,
     _detect_key_cards,
     _find_first_key_card_turn,
+    _generate_recommendations,
     _generate_warnings,
+    _get_cost_bucket,
+    _has_playable_turn_1,
     _run_trial,
     _should_mulligan,
     _validate_deck_size,
@@ -425,6 +431,162 @@ class TestSetupTimeCalculation:
 
 
 # =============================================================================
+# Test Hand Cost Calculation
+# =============================================================================
+
+
+class TestHandCostCalculation:
+    """Tests for hand cost calculation."""
+
+    def test_calculate_hand_cost_mixed_hand(self, sample_card_data):
+        """Calculate cost of mixed hand."""
+        hand = ["01016", "01088", "01092"]  # Machete (3) + Flashlight (2) + Knife (1)
+        result = _calculate_hand_cost(hand, sample_card_data)
+        assert result == 6.0
+
+    def test_calculate_hand_cost_with_skills(self, sample_card_data):
+        """Skills have no cost and don't contribute."""
+        hand = ["01016", "01024", "01024"]  # Machete (3) + 2 skills (None)
+        result = _calculate_hand_cost(hand, sample_card_data)
+        assert result == 3.0
+
+    def test_calculate_hand_cost_all_skills(self, sample_card_data):
+        """All skills result in 0 cost."""
+        hand = ["01024", "01024", "01024"]  # 3 skills
+        result = _calculate_hand_cost(hand, sample_card_data)
+        assert result == 0.0
+
+    def test_calculate_hand_cost_empty_hand(self, sample_card_data):
+        """Empty hand has 0 cost."""
+        result = _calculate_hand_cost([], sample_card_data)
+        assert result == 0.0
+
+
+# =============================================================================
+# Test Playable Turn 1
+# =============================================================================
+
+
+class TestPlayableTurn1:
+    """Tests for playable turn 1 detection."""
+
+    def test_has_playable_turn_1_with_cheap_card(self, sample_card_data):
+        """Hand with 1-cost card is playable."""
+        hand = ["01092", "01020", "01024"]  # Knife (1), Beat Cop (4), Skill
+        result = _has_playable_turn_1(hand, sample_card_data)
+        assert result is True
+
+    def test_has_playable_turn_1_with_zero_cost(self, sample_card_data):
+        """Hand with 0-cost card is playable."""
+        hand = ["01086", "01020", "01020"]  # Emergency Cache (0)
+        result = _has_playable_turn_1(hand, sample_card_data)
+        assert result is True
+
+    def test_has_playable_turn_1_no_cheap_cards(self, sample_card_data):
+        """Hand with only expensive cards is not playable turn 1."""
+        hand = ["01016", "01020", "01024"]  # Machete (3), Beat Cop (4), Skill
+        result = _has_playable_turn_1(hand, sample_card_data)
+        assert result is False
+
+    def test_has_playable_turn_1_all_skills(self, sample_card_data):
+        """Skills don't count as playable (they're commits)."""
+        hand = ["01024", "01024", "01024"]
+        result = _has_playable_turn_1(hand, sample_card_data)
+        assert result is False
+
+
+# =============================================================================
+# Test Hand Quality Score
+# =============================================================================
+
+
+class TestHandQualityScore:
+    """Tests for hand quality scoring."""
+
+    def test_hand_quality_with_key_card(self, sample_card_data):
+        """Hand with key card gets bonus points."""
+        hand = ["01088", "01092", "01016", "01024", "01024"]
+        key_cards = {"01088"}  # Flashlight is key
+
+        score, breakdown = _calculate_hand_quality(hand, key_cards, sample_card_data)
+
+        assert breakdown.key_card_component == 30.0
+        assert score >= 30.0
+
+    def test_hand_quality_without_key_card(self, sample_card_data):
+        """Hand without key card gets no key card bonus."""
+        hand = ["01016", "01020", "01024", "01024", "01024"]
+        key_cards = {"01088"}  # Looking for Flashlight, not in hand
+
+        score, breakdown = _calculate_hand_quality(hand, key_cards, sample_card_data)
+
+        assert breakdown.key_card_component == 0.0
+
+    def test_hand_quality_score_range(self, sample_card_data):
+        """Quality score is always 0-100."""
+        hands = [
+            ["01088", "01092", "01086", "01016", "01020"],  # Mixed good hand
+            ["01024", "01024", "01024", "01024", "01024"],  # All skills
+            ["01020", "01020", "01020", "01020", "01020"],  # All expensive
+        ]
+        key_cards = {"01088"}
+
+        for hand in hands:
+            score, _ = _calculate_hand_quality(hand, key_cards, sample_card_data)
+            assert 0.0 <= score <= 100.0
+
+    def test_hand_quality_penalizes_all_skills(self, sample_card_data):
+        """All-skill hands get lower type mix score."""
+        all_skills = ["01024", "01024", "01024", "01024", "01024"]
+        mixed_hand = ["01088", "01092", "01024", "01024", "01086"]
+        key_cards = set()
+
+        skill_score, skill_breakdown = _calculate_hand_quality(
+            all_skills, key_cards, sample_card_data
+        )
+        mixed_score, mixed_breakdown = _calculate_hand_quality(
+            mixed_hand, key_cards, sample_card_data
+        )
+
+        assert mixed_breakdown.type_mix_component > skill_breakdown.type_mix_component
+
+
+# =============================================================================
+# Test Cost Bucket
+# =============================================================================
+
+
+class TestCostBucket:
+    """Tests for cost bucket categorization."""
+
+    def test_cost_bucket_zero(self):
+        """0 cost goes to cost_0."""
+        assert _get_cost_bucket(0) == "cost_0"
+
+    def test_cost_bucket_one(self):
+        """1 cost goes to cost_1."""
+        assert _get_cost_bucket(1) == "cost_1"
+
+    def test_cost_bucket_two(self):
+        """2 cost goes to cost_2."""
+        assert _get_cost_bucket(2) == "cost_2"
+
+    def test_cost_bucket_three(self):
+        """3 cost goes to cost_3."""
+        assert _get_cost_bucket(3) == "cost_3"
+
+    def test_cost_bucket_four_plus(self):
+        """4+ cost goes to cost_4_plus."""
+        assert _get_cost_bucket(4) == "cost_4_plus"
+        assert _get_cost_bucket(5) == "cost_4_plus"
+        assert _get_cost_bucket(10) == "cost_4_plus"
+
+    def test_cost_bucket_none(self):
+        """None cost (skills) goes to no_cost."""
+        assert _get_cost_bucket(None) == "no_cost"
+
+
+# =============================================================================
 # Test Warning Generation
 # =============================================================================
 
@@ -483,6 +645,110 @@ class TestWarningGeneration:
 
 
 # =============================================================================
+# Test Recommendation Generation
+# =============================================================================
+
+
+class TestRecommendationGeneration:
+    """Tests for recommendation generation."""
+
+    def test_recommendation_low_hand_quality(self):
+        """Recommendation for low hand quality score."""
+        metrics = {
+            "hand_quality_score": 40.0,
+            "hand_quality_breakdown": HandQualityBreakdown(
+                key_card_component=10.0,
+                cost_component=15.0,
+                type_mix_component=15.0,
+            ),
+            "avg_hand_cost": 8.0,
+            "playable_turn_1_rate": 0.7,
+            "any_key_card_rate": 0.5,
+            "cost_distribution": type(
+                "MockDist", (), {"cost_0": 0.1, "cost_1": 0.2, "cost_2": 0.2, "cost_4_plus": 0.1}
+            )(),
+        }
+        recommendations = _generate_recommendations(metrics, {})
+        assert any("key cards" in r.lower() for r in recommendations)
+
+    def test_recommendation_high_hand_cost(self):
+        """Recommendation for high average hand cost."""
+        metrics = {
+            "hand_quality_score": 60.0,
+            "hand_quality_breakdown": HandQualityBreakdown(
+                key_card_component=20.0,
+                cost_component=20.0,
+                type_mix_component=20.0,
+            ),
+            "avg_hand_cost": 15.0,  # High cost
+            "playable_turn_1_rate": 0.7,
+            "any_key_card_rate": 0.5,
+            "cost_distribution": type(
+                "MockDist", (), {"cost_0": 0.1, "cost_1": 0.1, "cost_2": 0.1, "cost_4_plus": 0.3}
+            )(),
+        }
+        recommendations = _generate_recommendations(metrics, {})
+        assert any("high" in r.lower() and "cost" in r.lower() for r in recommendations)
+
+    def test_recommendation_low_playable_turn_1(self):
+        """Recommendation for low playable turn 1 rate."""
+        metrics = {
+            "hand_quality_score": 60.0,
+            "hand_quality_breakdown": HandQualityBreakdown(
+                key_card_component=20.0,
+                cost_component=20.0,
+                type_mix_component=20.0,
+            ),
+            "avg_hand_cost": 8.0,
+            "playable_turn_1_rate": 0.4,  # Low
+            "any_key_card_rate": 0.5,
+            "cost_distribution": type(
+                "MockDist", (), {"cost_0": 0.1, "cost_1": 0.1, "cost_2": 0.2, "cost_4_plus": 0.2}
+            )(),
+        }
+        recommendations = _generate_recommendations(metrics, {})
+        assert any("playable turn 1" in r.lower() for r in recommendations)
+
+    def test_recommendation_low_key_card_rate(self):
+        """Recommendation for low key card presence."""
+        metrics = {
+            "hand_quality_score": 60.0,
+            "hand_quality_breakdown": HandQualityBreakdown(
+                key_card_component=20.0,
+                cost_component=20.0,
+                type_mix_component=20.0,
+            ),
+            "avg_hand_cost": 8.0,
+            "playable_turn_1_rate": 0.7,
+            "any_key_card_rate": 0.3,  # Low
+            "cost_distribution": type(
+                "MockDist", (), {"cost_0": 0.1, "cost_1": 0.2, "cost_2": 0.2, "cost_4_plus": 0.2}
+            )(),
+        }
+        recommendations = _generate_recommendations(metrics, {})
+        assert any("key card presence" in r.lower() for r in recommendations)
+
+    def test_no_recommendations_for_good_metrics(self):
+        """No recommendations when metrics are good."""
+        metrics = {
+            "hand_quality_score": 75.0,
+            "hand_quality_breakdown": HandQualityBreakdown(
+                key_card_component=25.0,
+                cost_component=25.0,
+                type_mix_component=25.0,
+            ),
+            "avg_hand_cost": 8.0,
+            "playable_turn_1_rate": 0.8,
+            "any_key_card_rate": 0.7,
+            "cost_distribution": type(
+                "MockDist", (), {"cost_0": 0.15, "cost_1": 0.2, "cost_2": 0.25, "cost_4_plus": 0.1}
+            )(),
+        }
+        recommendations = _generate_recommendations(metrics, {})
+        assert len(recommendations) == 0
+
+
+# =============================================================================
 # Test Integration
 # =============================================================================
 
@@ -511,15 +777,40 @@ class TestSimulationIntegration:
         # Check required fields exist
         assert "deck_id" in result
         assert "n_trials" in result
+        assert "mulligan_strategy" in result
         assert "metrics" in result
         assert "key_card_reliability" in result
         assert "warnings" in result
+        assert "recommendations" in result
 
-        # Check metrics structure
+        # Check metrics structure - original fields
         assert "avg_setup_time" in result["metrics"]
         assert "avg_draws_to_key_card" in result["metrics"]
         assert "success_rate" in result["metrics"]
         assert "mulligan_rate" in result["metrics"]
+
+        # Check new metric fields
+        assert "any_key_card_rate" in result["metrics"]
+        assert "avg_hand_cost" in result["metrics"]
+        assert "playable_turn_1_rate" in result["metrics"]
+        assert "hand_quality_score" in result["metrics"]
+        assert "hand_quality_breakdown" in result["metrics"]
+        assert "cost_distribution" in result["metrics"]
+
+        # Check cost distribution structure
+        cost_dist = result["metrics"]["cost_distribution"]
+        assert "cost_0" in cost_dist
+        assert "cost_1" in cost_dist
+        assert "cost_2" in cost_dist
+        assert "cost_3" in cost_dist
+        assert "cost_4_plus" in cost_dist
+        assert "no_cost" in cost_dist
+
+        # Check hand quality breakdown structure
+        breakdown = result["metrics"]["hand_quality_breakdown"]
+        assert "key_card_component" in breakdown
+        assert "cost_component" in breakdown
+        assert "type_mix_component" in breakdown
 
     @patch("backend.services.simulator.ChromaClient")
     @patch("backend.services.simulator.CardDataLoader")
@@ -612,3 +903,69 @@ class TestStatisticalProperties:
         assert abs(observed_rate - expected_rate) < 0.05, (
             f"Observed {observed_rate:.3f}, expected ~{expected_rate:.3f}"
         )
+
+    def test_cost_distribution_sums_to_one(self):
+        """Verify cost distribution proportions sum to 1.0."""
+        # Create a mixed deck
+        deck = (
+            ["cheap"] * 10  # cost 1
+            + ["medium"] * 10  # cost 3
+            + ["expensive"] * 5  # cost 5
+            + ["skill"] * 5  # no cost
+        )
+        key_cards = set()
+        card_data = {
+            "cheap": {"code": "cheap", "type_name": "Asset", "cost": 1},
+            "medium": {"code": "medium", "type_name": "Asset", "cost": 3},
+            "expensive": {"code": "expensive", "type_name": "Asset", "cost": 5},
+            "skill": {"code": "skill", "type_name": "Skill", "cost": None},
+        }
+
+        rng = random.Random(42)
+        n_trials = 1000
+        cost_totals = {
+            "cost_0": 0,
+            "cost_1": 0,
+            "cost_2": 0,
+            "cost_3": 0,
+            "cost_4_plus": 0,
+            "no_cost": 0,
+        }
+
+        for _ in range(n_trials):
+            result = _run_trial(deck, card_data, key_cards, MulliganStrategy.NONE, rng)
+            for bucket, count in result["cost_counts"].items():
+                cost_totals[bucket] += count
+
+        total_cards = n_trials * 5
+        total_proportion = sum(cost_totals.values()) / total_cards
+        assert abs(total_proportion - 1.0) < 0.001
+
+    def test_hand_quality_consistency_across_trials(self):
+        """Verify hand quality score is consistent for similar hands."""
+        # Create a deck with good cards
+        deck = ["key_card"] * 4 + ["cheap_asset"] * 10 + ["medium_asset"] * 8 + ["skill"] * 8
+        key_cards = {"key_card"}
+        card_data = {
+            "key_card": {"code": "key_card", "type_name": "Asset", "cost": 2},
+            "cheap_asset": {"code": "cheap_asset", "type_name": "Asset", "cost": 1},
+            "medium_asset": {"code": "medium_asset", "type_name": "Asset", "cost": 3},
+            "skill": {"code": "skill", "type_name": "Skill", "cost": None},
+        }
+
+        rng = random.Random(42)
+        n_trials = 1000
+        quality_scores = []
+
+        for _ in range(n_trials):
+            result = _run_trial(deck, card_data, key_cards, MulliganStrategy.NONE, rng)
+            quality_scores.append(result["quality_score"])
+
+        # Average quality should be reasonable (not too low, not max)
+        avg_quality = sum(quality_scores) / len(quality_scores)
+        assert 30 <= avg_quality <= 80, f"Average quality {avg_quality} seems unreasonable"
+
+        # Quality scores should have some variance
+        min_q = min(quality_scores)
+        max_q = max(quality_scores)
+        assert max_q - min_q > 10, "Quality scores should vary based on hand composition"

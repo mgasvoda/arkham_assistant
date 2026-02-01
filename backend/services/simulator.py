@@ -11,6 +11,8 @@ import random
 from statistics import mean
 
 from backend.models.simulation_models import (
+    CostDistribution,
+    HandQualityBreakdown,
     KeyCardStats,
     MulliganStrategy,
     SimulationConfig,
@@ -258,6 +260,29 @@ def _run_trial(
     # Calculate setup time (turns until 2+ assets playable)
     setup_time = _calculate_setup_time(final_hand, remaining_deck, card_data)
 
+    # Calculate hand cost
+    hand_cost = _calculate_hand_cost(final_hand, card_data)
+
+    # Check if playable turn 1
+    playable_turn_1 = _has_playable_turn_1(final_hand, card_data)
+
+    # Calculate hand quality
+    quality_score, quality_breakdown = _calculate_hand_quality(final_hand, key_cards, card_data)
+
+    # Track cost distribution for this hand
+    cost_counts = {
+        "cost_0": 0,
+        "cost_1": 0,
+        "cost_2": 0,
+        "cost_3": 0,
+        "cost_4_plus": 0,
+        "no_cost": 0,
+    }
+    for card_id in final_hand:
+        card = card_data.get(card_id, {})
+        bucket = _get_cost_bucket(card.get("cost"))
+        cost_counts[bucket] += 1
+
     return {
         "opening_hand": opening_hand,
         "final_hand": final_hand,
@@ -265,6 +290,11 @@ def _run_trial(
         "key_cards_in_hand": key_cards_in_hand,
         "turns_to_key_card": turns_to_key_card,
         "setup_time": setup_time,
+        "hand_cost": hand_cost,
+        "playable_turn_1": playable_turn_1,
+        "quality_score": quality_score,
+        "quality_breakdown": quality_breakdown,
+        "cost_counts": cost_counts,
     }
 
 
@@ -357,6 +387,156 @@ def _calculate_setup_time(
 
 
 # =============================================================================
+# Hand Analysis Metrics
+# =============================================================================
+
+
+def _calculate_hand_cost(hand: list[str], card_data: dict[str, dict]) -> float:
+    """Calculate total cost of cards in hand.
+
+    Args:
+        hand: List of card IDs in hand.
+        card_data: Dict mapping card_id -> card info.
+
+    Returns:
+        Total resource cost of playable cards (skills have cost 0).
+    """
+    total = 0.0
+    for card_id in hand:
+        card = card_data.get(card_id, {})
+        cost = card.get("cost")
+        if cost is not None:
+            total += cost
+    return total
+
+
+def _has_playable_turn_1(hand: list[str], card_data: dict[str, dict]) -> bool:
+    """Check if hand has at least one card playable turn 1.
+
+    A card is playable turn 1 if it costs 0 or 1 resources.
+    Skills (no cost) are also considered playable.
+
+    Args:
+        hand: List of card IDs in hand.
+        card_data: Dict mapping card_id -> card info.
+
+    Returns:
+        True if at least one playable card exists.
+    """
+    for card_id in hand:
+        card = card_data.get(card_id, {})
+        cost = card.get("cost")
+        # Skills have no cost and are always playable
+        if cost is None:
+            continue
+        # 0 or 1 cost cards are playable turn 1
+        if cost <= 1:
+            return True
+    return False
+
+
+def _calculate_hand_quality(
+    hand: list[str],
+    key_cards: set[str],
+    card_data: dict[str, dict],
+) -> tuple[float, HandQualityBreakdown]:
+    """Calculate composite hand quality score (0-100).
+
+    Score components:
+    - Key card presence: 30 points max
+    - Cost balance: 35 points max (based on playable cards)
+    - Type mix: 35 points max (diversity of card types)
+
+    Args:
+        hand: List of card IDs in hand.
+        key_cards: Set of key card IDs.
+        card_data: Dict mapping card_id -> card info.
+
+    Returns:
+        Tuple of (total_score, breakdown).
+    """
+    # Key card component (0-30 points)
+    has_key = any(cid in key_cards for cid in hand)
+    key_card_points = 30.0 if has_key else 0.0
+
+    # Cost balance component (0-35 points)
+    # Award points for having low-cost playable cards
+    playable_costs = []
+    for card_id in hand:
+        card = card_data.get(card_id, {})
+        cost = card.get("cost")
+        if cost is not None:
+            playable_costs.append(cost)
+
+    if playable_costs:
+        # Score based on having cheap cards (0-2 cost is good)
+        cheap_count = sum(1 for c in playable_costs if c <= 2)
+        medium_count = sum(1 for c in playable_costs if c == 3)
+        # Up to 35 points: 7 per cheap card, 3 per medium
+        cost_points = min(35.0, cheap_count * 7.0 + medium_count * 3.0)
+    else:
+        # All skills, give partial credit
+        cost_points = 15.0
+
+    # Type mix component (0-35 points)
+    # Penalize all-skill or all-expensive-asset hands
+    type_counts = {"Asset": 0, "Event": 0, "Skill": 0}
+    for card_id in hand:
+        card = card_data.get(card_id, {})
+        card_type = card.get("type_name", "")
+        if card_type in type_counts:
+            type_counts[card_type] += 1
+
+    hand_size = len(hand)
+    if hand_size > 0:
+        # Check for excessive concentration
+        skill_ratio = type_counts["Skill"] / hand_size
+        asset_ratio = type_counts["Asset"] / hand_size
+
+        # Base points for type diversity
+        unique_types = sum(1 for c in type_counts.values() if c > 0)
+        type_points = unique_types * 10.0  # Up to 30 for 3 types
+
+        # Penalty for extreme concentration
+        if skill_ratio > 0.7:
+            type_points = max(0, type_points - 15.0)
+        if asset_ratio > 0.8:
+            type_points = max(0, type_points - 10.0)
+
+        # Bonus for balanced mix
+        if 0.2 <= skill_ratio <= 0.6 and 0.2 <= asset_ratio <= 0.6:
+            type_points = min(35.0, type_points + 5.0)
+
+        type_points = min(35.0, type_points)
+    else:
+        type_points = 0.0
+
+    total = key_card_points + cost_points + type_points
+    breakdown = HandQualityBreakdown(
+        key_card_component=round(key_card_points, 1),
+        cost_component=round(cost_points, 1),
+        type_mix_component=round(type_points, 1),
+    )
+
+    return round(total, 1), breakdown
+
+
+def _get_cost_bucket(cost: int | None) -> str:
+    """Categorize card cost into distribution bucket."""
+    if cost is None:
+        return "no_cost"
+    if cost == 0:
+        return "cost_0"
+    if cost == 1:
+        return "cost_1"
+    if cost == 2:
+        return "cost_2"
+    if cost == 3:
+        return "cost_3"
+    return "cost_4_plus"
+
+
+# =============================================================================
 # Metrics Aggregation
 # =============================================================================
 
@@ -396,6 +576,55 @@ def _aggregate_metrics(
     )
     success_rate = success_count / n_trials
 
+    # Any key card rate (at least one key card in opening hand)
+    any_key_card_count = sum(1 for t in trials if len(t["key_cards_in_hand"]) > 0)
+    any_key_card_rate = any_key_card_count / n_trials
+
+    # Average hand cost
+    hand_costs = [t["hand_cost"] for t in trials]
+    avg_hand_cost = mean(hand_costs)
+
+    # Playable turn 1 rate
+    playable_count = sum(1 for t in trials if t["playable_turn_1"])
+    playable_turn_1_rate = playable_count / n_trials
+
+    # Average hand quality score
+    quality_scores = [t["quality_score"] for t in trials]
+    avg_quality_score = mean(quality_scores)
+
+    # Average quality breakdown
+    avg_key_component = mean(t["quality_breakdown"].key_card_component for t in trials)
+    avg_cost_component = mean(t["quality_breakdown"].cost_component for t in trials)
+    avg_type_component = mean(t["quality_breakdown"].type_mix_component for t in trials)
+    avg_quality_breakdown = HandQualityBreakdown(
+        key_card_component=round(avg_key_component, 1),
+        cost_component=round(avg_cost_component, 1),
+        type_mix_component=round(avg_type_component, 1),
+    )
+
+    # Aggregate cost distribution
+    total_cards = n_trials * 5  # 5 cards per hand
+    cost_totals = {
+        "cost_0": 0,
+        "cost_1": 0,
+        "cost_2": 0,
+        "cost_3": 0,
+        "cost_4_plus": 0,
+        "no_cost": 0,
+    }
+    for trial in trials:
+        for bucket, count in trial["cost_counts"].items():
+            cost_totals[bucket] += count
+
+    cost_distribution = CostDistribution(
+        cost_0=round(cost_totals["cost_0"] / total_cards, 3),
+        cost_1=round(cost_totals["cost_1"] / total_cards, 3),
+        cost_2=round(cost_totals["cost_2"] / total_cards, 3),
+        cost_3=round(cost_totals["cost_3"] / total_cards, 3),
+        cost_4_plus=round(cost_totals["cost_4_plus"] / total_cards, 3),
+        no_cost=round(cost_totals["no_cost"] / total_cards, 3),
+    )
+
     # Key card reliability per card
     key_card_stats = _calculate_key_card_stats(trials, key_cards, card_data)
 
@@ -406,7 +635,12 @@ def _aggregate_metrics(
         ),
         "success_rate": round(success_rate, 3),
         "mulligan_rate": round(mulligan_rate, 3),
-        "resource_efficiency": 0.0,  # Placeholder for future implementation
+        "any_key_card_rate": round(any_key_card_rate, 3),
+        "avg_hand_cost": round(avg_hand_cost, 2),
+        "playable_turn_1_rate": round(playable_turn_1_rate, 3),
+        "hand_quality_score": round(avg_quality_score, 1),
+        "hand_quality_breakdown": avg_quality_breakdown,
+        "cost_distribution": cost_distribution,
         "key_card_reliability": key_card_stats,
     }
 
@@ -517,6 +751,79 @@ def _generate_warnings(
     return warnings
 
 
+def _generate_recommendations(
+    metrics: dict,
+    key_card_stats: dict[str, KeyCardStats],
+) -> list[str]:
+    """Generate actionable recommendations based on simulation results.
+
+    Args:
+        metrics: Aggregate metrics dict.
+        key_card_stats: Per-card statistics.
+
+    Returns:
+        List of recommendation messages.
+    """
+    recommendations = []
+
+    # Low hand quality score
+    if metrics["hand_quality_score"] < 50:
+        breakdown = metrics["hand_quality_breakdown"]
+        if breakdown.key_card_component < 15:
+            recommendations.append(
+                "Consider adding more key cards or redundant effects to improve "
+                "opening hand reliability."
+            )
+        if breakdown.cost_component < 15:
+            recommendations.append(
+                "Too many expensive cards. Add more 0-2 cost cards for better early game options."
+            )
+        if breakdown.type_mix_component < 15:
+            recommendations.append(
+                "Card type balance is poor. Consider diversifying between assets, "
+                "events, and skills."
+            )
+
+    # High average hand cost
+    if metrics["avg_hand_cost"] > 12.5:  # Average 2.5 per card * 5 cards
+        recommendations.append(
+            f"Average hand cost is high ({metrics['avg_hand_cost']:.1f} resources). "
+            "This may slow down early game tempo."
+        )
+
+    # Low playable turn 1 rate
+    if metrics["playable_turn_1_rate"] < 0.6:
+        recommendations.append(
+            f"Only {metrics['playable_turn_1_rate'] * 100:.0f}% of opening hands "
+            "have a playable turn 1 card. Add more 0-1 cost cards."
+        )
+
+    # Low any key card rate
+    if metrics["any_key_card_rate"] < 0.4:
+        recommendations.append(
+            f"Key card presence is low ({metrics['any_key_card_rate'] * 100:.0f}%). "
+            "Consider adding more copies of key cards or similar effects."
+        )
+
+    # Cost distribution issues
+    cost_dist = metrics["cost_distribution"]
+    cheap_ratio = cost_dist.cost_0 + cost_dist.cost_1 + cost_dist.cost_2
+    expensive_ratio = cost_dist.cost_4_plus
+
+    if cheap_ratio < 0.3:
+        recommendations.append(
+            "Deck is top-heavy with few cheap cards. Add more 0-2 cost options for flexibility."
+        )
+
+    if expensive_ratio > 0.3:
+        recommendations.append(
+            f"{expensive_ratio * 100:.0f}% of cards cost 4+. Consider reducing "
+            "expensive cards for better curve."
+        )
+
+    return recommendations
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -594,15 +901,25 @@ def run_simulation(
     metrics = _aggregate_metrics(trials, key_cards, card_data)
     key_card_reliability = metrics.pop("key_card_reliability", {})
 
-    # Generate warnings
+    # Generate warnings and recommendations
     warnings.extend(_generate_warnings(metrics, key_card_reliability))
+    recommendations = _generate_recommendations(metrics, key_card_reliability)
+
+    # Convert Pydantic models to dicts for JSON serialization
+    metrics_dict = {
+        **metrics,
+        "hand_quality_breakdown": metrics["hand_quality_breakdown"].model_dump(),
+        "cost_distribution": metrics["cost_distribution"].model_dump(),
+    }
 
     return {
         "deck_id": deck_id,
         "n_trials": n_trials,
-        "metrics": metrics,
+        "mulligan_strategy": sim_config.mulligan_strategy.value,
+        "metrics": metrics_dict,
         "key_card_reliability": {
             cid: stats.model_dump() for cid, stats in key_card_reliability.items()
         },
         "warnings": warnings,
+        "recommendations": recommendations,
     }
