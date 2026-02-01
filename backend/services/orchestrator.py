@@ -324,6 +324,11 @@ class DeckBuilderState(BaseModel):
     deck_warnings: list[str] = Field(default_factory=list)
     validation_passed: bool = False
 
+    # Validation loop tracking
+    iteration_count: int = 0
+    gaps_to_fill: list[str] = Field(default_factory=list)
+    cards_already_tried: set[str] = Field(default_factory=set)
+
     # Subagent Results for transparency
     subagent_results: list[DeckBuilderSubagentResult] = Field(default_factory=list)
 
@@ -1014,7 +1019,11 @@ Respond in this exact JSON format:
 
         The graph follows:
         START -> extract_goals -> get_constraints -> [analyze_scenario] ->
-        search_cards -> build_deck -> validate_deck -> synthesize_deck -> END
+        search_cards -> build_deck -> validate_deck -> [fill_gaps ->
+        validate_deck (loop up to 2x)] -> synthesize_deck -> END
+
+        The validation loop allows the deck builder to iteratively improve
+        the deck by searching for cards that fill identified gaps.
 
         Returns:
             Compiled StateGraph ready for deck building execution.
@@ -1028,6 +1037,7 @@ Respond in this exact JSON format:
         graph.add_node("search_cards", self._search_cards_node)
         graph.add_node("build_deck", self._build_deck_node)
         graph.add_node("validate_deck", self._validate_deck_node)
+        graph.add_node("fill_gaps", self._fill_gaps_node)
         graph.add_node("synthesize_deck", self._synthesize_deck_response_node)
 
         # Define edges
@@ -1052,7 +1062,44 @@ Respond in this exact JSON format:
         graph.add_edge("analyze_scenario", "search_cards")
         graph.add_edge("search_cards", "build_deck")
         graph.add_edge("build_deck", "validate_deck")
-        graph.add_edge("validate_deck", "synthesize_deck")
+
+        # Conditional edge: refine deck if gaps exist and haven't exceeded iterations
+        def should_refine_deck(state: DeckBuilderState) -> str:
+            """Determine if deck needs refinement or is ready for synthesis.
+
+            Refinement happens when:
+            - There are gaps to fill
+            - We haven't exceeded max iterations (2)
+            - The deck is incomplete (under target size)
+
+            Returns:
+                "fill_gaps" to continue refining, "synthesize_deck" to finalize.
+            """
+            max_iterations = 2
+
+            # Check if we have gaps and haven't exceeded iterations
+            has_gaps = bool(state.gaps_to_fill)
+            under_iteration_limit = state.iteration_count < max_iterations
+
+            # Also check if deck is significantly incomplete
+            deck_size = state.constraints.deck_size if state.constraints else 30
+            deck_incomplete = state.current_card_count < deck_size
+
+            if has_gaps and under_iteration_limit and (deck_incomplete or has_gaps):
+                return "fill_gaps"
+            return "synthesize_deck"
+
+        graph.add_conditional_edges(
+            "validate_deck",
+            should_refine_deck,
+            {
+                "fill_gaps": "fill_gaps",
+                "synthesize_deck": "synthesize_deck",
+            },
+        )
+
+        # After filling gaps, validate again
+        graph.add_edge("fill_gaps", "validate_deck")
         graph.add_edge("synthesize_deck", END)
 
         return graph.compile()
@@ -1530,20 +1577,34 @@ Respond in this exact JSON format:
         - Overall deck health
         - Warnings about the build
 
+        Also parses gaps into capability keywords for the refinement loop.
+
         Args:
             state: Current deck builder state.
 
         Returns:
-            State update with validation results.
+            State update with validation results and gaps_to_fill for refinement.
         """
         subagent_results = list(state.subagent_results)
         warnings: list[str] = []
+        gaps_to_fill: list[str] = []
+
+        # Map gap descriptions to capability search terms
+        gap_to_capability = {
+            "combat capability": "combat",
+            "clue gathering": "clues",
+            "card draw": "card_draw",
+            "resource generation": "economy",
+            "willpower commit icons": "willpower",
+            "treachery protection": "treachery_protection",
+            "healing": "healing",
+        }
 
         # Check card count
-        if state.current_card_count < (state.constraints.deck_size if state.constraints else 30):
+        deck_size = state.constraints.deck_size if state.constraints else 30
+        if state.current_card_count < deck_size:
             warnings.append(
-                f"Deck has {state.current_card_count} cards, "
-                f"needs {state.constraints.deck_size if state.constraints else 30}"
+                f"Deck has {state.current_card_count} cards, needs {deck_size}"
             )
 
         # Use StateAgent for detailed analysis
@@ -1565,17 +1626,24 @@ Respond in this exact JSON format:
             )
             response = state_agent.analyze(state_query)
 
-            # Extract gaps from response
+            # Extract gaps from response and parse into capability keywords
             if hasattr(response, "identified_gaps") and response.identified_gaps:
                 for gap in response.identified_gaps:
                     warnings.append(f"Gap: {gap}")
 
+                    # Parse gap description to capability keyword
+                    gap_lower = gap.lower()
+                    for description, capability in gap_to_capability.items():
+                        if description in gap_lower:
+                            gaps_to_fill.append(capability)
+                            break
+
             subagent_results.append(
                 DeckBuilderSubagentResult(
                     agent_type="state",
-                    query="Validate deck composition",
+                    query=f"Validate deck composition (iteration {state.iteration_count + 1})",
                     success=True,
-                    summary=f"Found {len(warnings)} issues",
+                    summary=f"Found {len(warnings)} issues, {len(gaps_to_fill)} fillable gaps",
                 )
             )
 
@@ -1595,6 +1663,176 @@ Respond in this exact JSON format:
         return {
             "deck_warnings": warnings,
             "validation_passed": validation_passed,
+            "gaps_to_fill": gaps_to_fill,
+            "iteration_count": state.iteration_count + 1,
+            "subagent_results": subagent_results,
+        }
+
+    def _fill_gaps_node(self, state: DeckBuilderState) -> dict[str, Any]:
+        """Search for and incorporate cards to fill identified gaps.
+
+        This node is called when validation identifies gaps that can be filled.
+        It searches for cards matching gap capabilities and incorporates them
+        into the deck, potentially replacing lower-value cards.
+
+        Args:
+            state: Current deck builder state with gaps_to_fill populated.
+
+        Returns:
+            State update with updated selected_cards and candidate_cards.
+        """
+        if not state.gaps_to_fill or not state.constraints:
+            return {}
+
+        subagent_results = list(state.subagent_results)
+        action_agent = self._get_subagent(SubagentType.ACTION_SPACE)
+
+        # Track cards we've already selected to avoid re-adding
+        selected_ids = {card.card_id for card in state.selected_cards}
+        cards_already_tried = set(state.cards_already_tried)
+
+        # Search for gap-filling cards
+        gap_candidates: list[dict[str, Any]] = []
+
+        for gap_capability in state.gaps_to_fill:
+            try:
+                gap_query = ActionSpaceQuery(
+                    investigator_id=state.constraints.investigator_id,
+                    upgrade_points=0,
+                    capability_need=gap_capability,
+                    limit=10,
+                )
+                response = action_agent.search(gap_query)
+
+                if hasattr(response, "candidates") and response.candidates:
+                    for candidate in response.candidates:
+                        card_id = candidate.card_id
+                        # Skip cards already in deck or already tried without success
+                        if card_id not in selected_ids and card_id not in cards_already_tried:
+                            gap_candidates.append({
+                                "card_id": card_id,
+                                "name": candidate.name,
+                                "relevance_score": candidate.relevance_score,
+                                "reason": candidate.reason,
+                                "capability": gap_capability,
+                                "search_category": "gap_fill",
+                            })
+
+                candidate_count = len(response.candidates) if response.candidates else 0
+                subagent_results.append(
+                    DeckBuilderSubagentResult(
+                        agent_type="action_space",
+                        query=f"Fill gap: {gap_capability}",
+                        success=True,
+                        summary=f"Found {candidate_count} candidates",
+                    )
+                )
+            except Exception as e:
+                subagent_results.append(
+                    DeckBuilderSubagentResult(
+                        agent_type="action_space",
+                        query=f"Fill gap: {gap_capability}",
+                        success=False,
+                        summary=str(e),
+                    )
+                )
+
+        if not gap_candidates:
+            return {"subagent_results": subagent_results}
+
+        # Sort gap candidates by relevance
+        gap_candidates.sort(key=lambda c: c.get("relevance_score", 0), reverse=True)
+
+        # Build updated deck with gap-filling cards
+        deck_size = state.constraints.deck_size
+        selected = list(state.selected_cards)
+        card_counts: dict[str, int] = {}
+
+        # Track existing card counts
+        for card in selected:
+            card_counts[card.card_id] = card_counts.get(card.card_id, 0) + card.quantity
+
+        current_count = sum(card_counts.values())
+
+        # Strategy: If deck is underfilled, add gap cards
+        # If deck is full, replace lowest-relevance flex cards
+        cards_added = 0
+        max_cards_to_add = 6  # Limit cards added per iteration
+
+        for gap_card in gap_candidates:
+            if cards_added >= max_cards_to_add:
+                break
+
+            card_id = gap_card["card_id"]
+            current_copies = card_counts.get(card_id, 0)
+
+            if current_copies >= 2:
+                cards_already_tried.add(card_id)
+                continue
+
+            copies_to_add = min(2 - current_copies, 2)
+
+            if current_count + copies_to_add <= deck_size:
+                # Room to add directly
+                selected.append(
+                    CardSelection(
+                        card_id=card_id,
+                        name=gap_card["name"],
+                        quantity=copies_to_add,
+                        reason=f"Fills {gap_card['capability']} gap",
+                        category=gap_card["capability"],
+                    )
+                )
+                card_counts[card_id] = current_copies + copies_to_add
+                current_count += copies_to_add
+                cards_added += copies_to_add
+            else:
+                # Deck is full - try to replace lowest value flex cards
+                # Find flex cards sorted by relevance (lowest first for replacement)
+                flex_cards = [
+                    (i, card) for i, card in enumerate(selected)
+                    if card.category == "flex"
+                ]
+
+                if flex_cards:
+                    # Remove lowest value flex card to make room
+                    idx_to_remove, card_to_remove = flex_cards[0]
+                    removed_count = card_to_remove.quantity
+
+                    # Remove the card
+                    selected.pop(idx_to_remove)
+                    card_counts[card_to_remove.card_id] = max(
+                        0, card_counts.get(card_to_remove.card_id, 0) - removed_count
+                    )
+                    current_count -= removed_count
+
+                    # Add the gap-filling card
+                    copies_to_add = min(2 - current_copies, removed_count)
+                    cap = gap_card["capability"]
+                    replaced_name = card_to_remove.name
+                    selected.append(
+                        CardSelection(
+                            card_id=card_id,
+                            name=gap_card["name"],
+                            quantity=copies_to_add,
+                            reason=f"Fills {cap} gap (replaced {replaced_name})",
+                            category=cap,
+                        )
+                    )
+                    card_counts[card_id] = current_copies + copies_to_add
+                    current_count += copies_to_add
+                    cards_added += copies_to_add
+
+            cards_already_tried.add(card_id)
+
+        # Add gap candidates to the candidate pool for potential future use
+        all_candidates = list(state.candidate_cards) + gap_candidates
+
+        return {
+            "selected_cards": selected,
+            "current_card_count": current_count,
+            "candidate_cards": all_candidates,
+            "cards_already_tried": cards_already_tried,
             "subagent_results": subagent_results,
         }
 

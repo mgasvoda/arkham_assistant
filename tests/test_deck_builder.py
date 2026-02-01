@@ -1160,3 +1160,70 @@ class TestNewDeckResponseReadable:
         assert "## Warnings" in readable
         assert "Deck is incomplete" in readable
         assert "Missing card draw" in readable
+
+
+# =============================================================================
+# Validation Loop Tests
+# =============================================================================
+
+
+class TestValidationLoop:
+    """Tests for the validation loop that fills gaps in deck construction."""
+
+    def test_deck_builder_state_has_iteration_fields(self):
+        """DeckBuilderState should have fields for iteration tracking."""
+        request = OrchestratorRequest(
+            message="Build me a deck",
+            investigator_id="01001",
+            investigator_name="Roland Banks",
+        )
+        state = DeckBuilderState(request=request)
+
+        # New fields should be present with defaults
+        assert state.iteration_count == 0
+        assert state.gaps_to_fill == []
+        assert state.cards_already_tried == set()
+
+    def test_deck_builder_state_tracks_iterations(self):
+        """DeckBuilderState should track multiple iterations."""
+        request = OrchestratorRequest(
+            message="Build me a deck",
+            investigator_id="01001",
+            investigator_name="Roland Banks",
+        )
+        state = DeckBuilderState(
+            request=request,
+            iteration_count=1,
+            gaps_to_fill=["combat", "clues"],
+            cards_already_tried={"01016", "01017"},
+        )
+
+        assert state.iteration_count == 1
+        assert "combat" in state.gaps_to_fill
+        assert "clues" in state.gaps_to_fill
+        assert "01016" in state.cards_already_tried
+
+    def test_gap_to_capability_mapping(self):
+        """Gap descriptions should map to correct capability keywords."""
+        # This tests that the gap_to_capability dict is complete
+        gap_to_capability = {
+            "combat capability": "combat",
+            "clue gathering": "clues",
+            "card draw": "card_draw",
+            "resource generation": "economy",
+            "willpower commit icons": "willpower",
+            "treachery protection": "treachery_protection",
+            "healing": "healing",
+        }
+
+        # All StateAgent gaps should have mappings
+        from backend.services.subagents.state_agent import IDEAL_CAPABILITIES
+
+        for capability, config in IDEAL_CAPABILITIES.items():
+            description = config.get("description", "").lower()
+            # Check that at least one mapping key contains the description
+            found_mapping = any(
+                desc in description or description in desc
+                for desc in gap_to_capability.keys()
+            )
+            assert found_mapping, f"No mapping for capability: {capability} ({description})"
