@@ -10,7 +10,14 @@ export default function ChatWindow({ onOpenSimulation }) {
   const [dismissedProposals, setDismissedProposals] = useState(new Set());
   const messagesEndRef = useRef(null);
   const { messages, loading, sendMessage, analyzeDeck, suggestSwaps, runSimulation } = useChat();
-  const { activeDeck, setActiveDeck, setSelectedInvestigator } = useDeck();
+  const { activeDeck, selectedInvestigator, setActiveDeck, setSelectedInvestigator } = useDeck();
+
+  // Build context options for API requests
+  const buildContextOptions = () => ({
+    deckId: activeDeck?.id,
+    investigatorId: selectedInvestigator?.id || activeDeck?.investigator_id,
+    investigatorName: selectedInvestigator?.name || activeDeck?.investigator_name,
+  });
 
   // Helper to detect if structuredData contains a NewDeckResponse
   const isNewDeckResponse = (structuredData) => {
@@ -50,9 +57,9 @@ export default function ChatWindow({ onOpenSimulation }) {
 
     const message = input.trim();
     setInput('');
-    
+
     try {
-      await sendMessage(message, activeDeck?.id);
+      await sendMessage(message, buildContextOptions());
     } catch (err) {
       // Error is handled in context
     }
@@ -71,16 +78,18 @@ export default function ChatWindow({ onOpenSimulation }) {
       return;
     }
 
+    const options = buildContextOptions();
+
     try {
       switch (action) {
         case 'analyze':
-          await analyzeDeck(activeDeck.id);
+          await analyzeDeck(options);
           break;
         case 'swaps':
-          await suggestSwaps(activeDeck.id);
+          await suggestSwaps(options);
           break;
         case 'simulate':
-          await runSimulation(activeDeck.id);
+          await runSimulation(options);
           break;
       }
     } catch (err) {
