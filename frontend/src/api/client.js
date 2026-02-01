@@ -2,6 +2,8 @@
  * API client for backend communication.
  */
 
+import logger from '../utils/logger';
+
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 /**
@@ -14,62 +16,94 @@ export async function get(endpoint, params = {}) {
       url.searchParams.append(key, value);
     }
   });
-  
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      logger.warn(`API GET failed: ${endpoint}`, {
+        extra: { status: response.status, statusText: response.statusText },
+      });
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    logger.error(`API GET error: ${endpoint}`, { error });
+    throw error;
   }
-  return response.json();
 }
 
 /**
  * Make a POST request to the API.
  */
 export async function post(endpoint, data = {}) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      logger.warn(`API POST failed: ${endpoint}`, {
+        extra: { status: response.status, statusText: response.statusText },
+      });
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    logger.error(`API POST error: ${endpoint}`, { error });
+    throw error;
   }
-  return response.json();
 }
 
 /**
  * Make a PUT request to the API.
  */
 export async function put(endpoint, data = {}) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      logger.warn(`API PUT failed: ${endpoint}`, {
+        extra: { status: response.status, statusText: response.statusText },
+      });
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    logger.error(`API PUT error: ${endpoint}`, { error });
+    throw error;
   }
-  return response.json();
 }
 
 /**
  * Make a DELETE request to the API.
  */
 export async function del(endpoint) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'DELETE',
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      logger.warn(`API DELETE failed: ${endpoint}`, {
+        extra: { status: response.status, statusText: response.statusText },
+      });
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    logger.error(`API DELETE error: ${endpoint}`, { error });
+    throw error;
   }
-  return response.json();
 }
 
 // Convenience functions for specific endpoints
@@ -78,7 +112,7 @@ export const api = {
     search: (params) => get('/cards', params),
     get: (id) => get(`/cards/${id}`),
   },
-  
+
   decks: {
     list: () => get('/decks'),
     get: (id) => get(`/decks/${id}`),
@@ -86,18 +120,17 @@ export const api = {
     update: (id, data) => put(`/decks/${id}`, data),
     delete: (id) => del(`/decks/${id}`),
   },
-  
+
   characters: {
     list: () => get('/characters'),
     get: (id) => get(`/characters/${id}`),
   },
-  
+
   sim: {
     run: (data) => post('/sim/run', data),
   },
-  
+
   chat: {
     send: (data) => post('/chat/', data),
   },
 };
-

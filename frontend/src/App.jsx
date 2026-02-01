@@ -7,6 +7,7 @@ import ChatWindow from './components/ChatWindow';
 import SimulationReport from './components/SimulationReport';
 import CardDetail from './components/CardDetail';
 import Modal from './components/common/Modal';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
@@ -33,58 +34,60 @@ function App() {
   };
 
   return (
-    <DeckProvider>
-      <ChatProvider>
-        <div className="App" data-testid="app">
-          <header className="app-header">
-            <div className="header-content">
-              <h1>🃏 Arkham Assistant</h1>
-              <p>AI-powered deckbuilding for Arkham Horror LCG</p>
-            </div>
-          </header>
+    <ErrorBoundary name="App">
+      <DeckProvider>
+        <ChatProvider>
+          <div className="App" data-testid="app">
+            <header className="app-header">
+              <div className="header-content">
+                <h1>Arkham Assistant</h1>
+                <p>AI-powered deckbuilding for Arkham Horror LCG</p>
+              </div>
+            </header>
 
-          <main className="app-main">
-            <div className="main-content">
-              <div className={`pane search-pane ${searchPaneCollapsed ? 'collapsed' : ''}`}>
-                <button 
-                  className="collapse-toggle"
-                  onClick={() => setSearchPaneCollapsed(!searchPaneCollapsed)}
-                  aria-label={searchPaneCollapsed ? "Expand search" : "Collapse search"}
-                >
-                  {searchPaneCollapsed ? '›' : '‹'}
-                </button>
-                <DeckSearch collapsed={searchPaneCollapsed} onCardClick={handleCardClick} />
+            <main className="app-main">
+              <div className="main-content">
+                <div className={`pane search-pane ${searchPaneCollapsed ? 'collapsed' : ''}`}>
+                  <button
+                    className="collapse-toggle"
+                    onClick={() => setSearchPaneCollapsed(!searchPaneCollapsed)}
+                    aria-label={searchPaneCollapsed ? 'Expand search' : 'Collapse search'}
+                  >
+                    {searchPaneCollapsed ? '›' : '‹'}
+                  </button>
+                  <DeckSearch collapsed={searchPaneCollapsed} onCardClick={handleCardClick} />
+                </div>
+
+                <div className="pane deck-pane">
+                  <DeckBuilder onCardClick={handleCardClick} />
+                </div>
               </div>
 
-              <div className="pane deck-pane">
-                <DeckBuilder onCardClick={handleCardClick} />
+              <div className="sidebar">
+                <div className="pane chat-pane">
+                  <ChatWindow onOpenSimulation={handleOpenSimulation} />
+                </div>
               </div>
-            </div>
+            </main>
 
-            <div className="sidebar">
-              <div className="pane chat-pane">
-                <ChatWindow onOpenSimulation={handleOpenSimulation} />
-              </div>
-            </div>
-          </main>
+            <SimulationReport
+              isOpen={showSimulation}
+              onClose={handleCloseSimulation}
+              simulation={simulationData}
+            />
 
-          <SimulationReport
-            isOpen={showSimulation}
-            onClose={handleCloseSimulation}
-            simulation={simulationData}
-          />
-
-          <Modal
-            isOpen={!!selectedCard}
-            onClose={handleCloseCardDetail}
-            title={selectedCard?.name || selectedCard?.real_name || 'Card Details'}
-            size="large"
-          >
-            {selectedCard && <CardDetail card={selectedCard} />}
-          </Modal>
-        </div>
-      </ChatProvider>
-    </DeckProvider>
+            <Modal
+              isOpen={!!selectedCard}
+              onClose={handleCloseCardDetail}
+              title={selectedCard?.name || selectedCard?.real_name || 'Card Details'}
+              size="large"
+            >
+              {selectedCard && <CardDetail card={selectedCard} />}
+            </Modal>
+          </div>
+        </ChatProvider>
+      </DeckProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -87,3 +87,46 @@ For testing API endpoints locally:
 4. **View API docs**: http://localhost:8000/docs
 
 Note: The trailing slash on `/chat/` is required (FastAPI redirects without it). The user must first populate a .env with the OPENAI API KEY
+
+## Debugging with Logs
+
+Logs are written to `logs/` directory at project root:
+
+| File | Contents | Use Case |
+|------|----------|----------|
+| `arkham_assistant.log` | All backend logs (JSON) | General debugging |
+| `errors.log` | ERROR level only | Quick error review |
+| `agents.log` | Agent/subagent execution | Agent flow debugging |
+| `frontend.log` | Browser logs via POST /logs/ | Frontend debugging |
+
+### Reading Logs
+```bash
+# View recent errors
+tail -50 logs/errors.log | jq '.'
+
+# Find specific request by ID
+grep "request_id.*abc123" logs/arkham_assistant.log | jq '.'
+
+# View agent routing decisions
+grep "Querying subagent" logs/agents.log | jq '.message, .extra'
+
+# Follow logs in real-time
+tail -f logs/arkham_assistant.log | jq -r '.timestamp + " | " + .level + " | " + .message'
+
+# View frontend errors
+tail -20 logs/frontend.log | jq '.message, .extra'
+
+# Find all errors in the last 100 lines
+tail -100 logs/arkham_assistant.log | jq 'select(.level == "ERROR")'
+```
+
+### Log Levels
+- **DEBUG**: Detailed execution info (subagent queries, card lookups)
+- **INFO**: Request/response summaries, agent routing
+- **WARNING**: Non-critical issues (API failures, slow responses)
+- **ERROR**: Failures requiring attention
+
+### Correlation
+- Each HTTP request gets an `X-Request-ID` header and `request_id` in logs
+- Frontend logs include `session_id` for browser session correlation
+- Use these IDs to trace a request through the full stack

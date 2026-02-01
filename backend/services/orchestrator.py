@@ -22,6 +22,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
+from backend.core.logging_config import get_logger
 from backend.models.deck_builder_models import (
     CardSelection,
     DeckBuilderSubagentResult,
@@ -42,6 +43,8 @@ from backend.services.subagents import (
     create_scenario_agent,
     create_state_agent,
 )
+
+logger = get_logger(__name__)
 
 # =============================================================================
 # Enums and Constants
@@ -749,6 +752,10 @@ Keep the response focused and concise while being comprehensive."""
             SubagentResult with the query outcome.
         """
         try:
+            logger.debug(
+                f"Querying subagent: {agent_type.value}",
+                extra={"extra_data": {"agent_type": agent_type.value}},
+            )
             subagent = self._get_subagent(agent_type)
             query = self._format_subagent_query(agent_type, request)
 
@@ -791,6 +798,11 @@ Keep the response focused and concise while being comprehensive."""
             )
 
         except Exception as e:
+            logger.error(
+                f"Subagent query failed: {agent_type.value}",
+                extra={"extra_data": {"agent_type": agent_type.value, "error": str(e)}},
+                exc_info=True,
+            )
             return SubagentResult(
                 agent_type=agent_type.value,
                 query=request.message,
@@ -2579,6 +2591,17 @@ def process_chat_message(
     """
     context = context or {}
 
+    logger.info(
+        "Processing chat message",
+        extra={
+            "extra_data": {
+                "message_preview": message[:100] if message else None,
+                "has_deck": deck_id is not None,
+                "has_investigator": context.get("investigator_id") is not None,
+            }
+        },
+    )
+
     # Build request from parameters
     request = OrchestratorRequest(
         message=message,
@@ -2617,6 +2640,16 @@ def process_chat_message(
         # For Q&A responses
         reply = response.content
         agents_consulted = response.agents_consulted
+
+    logger.info(
+        "Chat message processed",
+        extra={
+            "extra_data": {
+                "agents_consulted": agents_consulted,
+                "response_type": type(response).__name__,
+            }
+        },
+    )
 
     return {
         "reply": reply,
