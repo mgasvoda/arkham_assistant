@@ -256,6 +256,42 @@ export default function ChatWindow({ onOpenSimulation }) {
               </div>
             )}
 
+            {/* Show recommendation from structured data if present */}
+            {message.structuredData?.recommendation && (
+              <div className="structured-recommendation">
+                <span className="rec-label">Recommendation:</span>
+                {message.structuredData.recommendation}
+              </div>
+            )}
+
+            {/* Show confidence indicator if present */}
+            {message.structuredData?.confidence !== undefined && (
+              <div className="confidence-indicator">
+                <span className="confidence-label">Confidence:</span>
+                <div className="confidence-bar">
+                  <div
+                    className="confidence-fill"
+                    style={{ width: `${message.structuredData.confidence * 100}%` }}
+                  />
+                </div>
+                <span className="confidence-value">
+                  {Math.round(message.structuredData.confidence * 100)}%
+                </span>
+              </div>
+            )}
+
+            {/* Show agents consulted */}
+            {message.agentsConsulted && message.agentsConsulted.length > 0 && (
+              <div className="agents-consulted">
+                <span className="agents-label">Consulted:</span>
+                {message.agentsConsulted.map(agent => (
+                  <span key={agent} className={`agent-badge agent-${agent.toLowerCase().replace('agent', '')}`}>
+                    {agent.replace('Agent', '')}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="message-time">
               {new Date(message.timestamp).toLocaleTimeString()}
             </div>
