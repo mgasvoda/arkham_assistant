@@ -128,12 +128,19 @@ class ChromaClient:
     # Deck operations
     def get_deck(self, deck_id: str) -> Optional[dict]:
         """Fetch single deck with full metadata."""
+        import json
         try:
             result = self.decks.get(ids=[deck_id])
             if result['ids']:
-                deck_data = result['metadatas'][0]
+                deck_data = result['metadatas'][0].copy()
                 deck_data['id'] = result['ids'][0]
                 deck_data['name'] = result['documents'][0]
+                # Parse cards JSON if stored as string
+                if "cards" in deck_data and isinstance(deck_data["cards"], str):
+                    try:
+                        deck_data["cards"] = json.loads(deck_data["cards"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
                 return deck_data
             return None
         except Exception as e:
@@ -142,13 +149,20 @@ class ChromaClient:
 
     def list_decks(self) -> list[dict]:
         """Return all decks."""
+        import json
         try:
             result = self.decks.get()
             decks = []
             for i, deck_id in enumerate(result['ids']):
-                deck_data = result['metadatas'][i]
+                deck_data = result['metadatas'][i].copy()
                 deck_data['id'] = deck_id
                 deck_data['name'] = result['documents'][i]
+                # Parse cards JSON if stored as string
+                if "cards" in deck_data and isinstance(deck_data["cards"], str):
+                    try:
+                        deck_data["cards"] = json.loads(deck_data["cards"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
                 decks.append(deck_data)
             return decks
         except Exception as e:
@@ -157,12 +171,20 @@ class ChromaClient:
 
     def create_deck(self, deck: dict) -> str:
         """Create deck, return new ID."""
+        import json
         import uuid
         deck_id = f"deck_{uuid.uuid4().hex[:8]}"
-        
+
         deck_copy = deck.copy()
         name = deck_copy.pop("name", "Untitled Deck")
-        
+
+        # JSON-serialize cards field for ChromaDB (metadata only supports scalars)
+        if "cards" in deck_copy and isinstance(deck_copy["cards"], list):
+            deck_copy["cards"] = json.dumps(deck_copy["cards"])
+
+        # Filter out None values - ChromaDB doesn't accept them
+        deck_copy = {k: v for k, v in deck_copy.items() if v is not None}
+
         try:
             self.decks.add(
                 ids=[deck_id],
@@ -176,19 +198,27 @@ class ChromaClient:
 
     def update_deck(self, deck_id: str, updates: dict) -> None:
         """Update deck fields."""
+        import json
         try:
             # Get current deck
             current = self.get_deck(deck_id)
             if not current:
                 raise ValueError(f"Deck {deck_id} not found")
-            
+
             # Merge updates
             name = updates.pop("name", current.get("name", "Untitled Deck"))
             current.update(updates)
             # Remove id field from metadata
             current.pop('id', None)
             current.pop('name', None)
-            
+
+            # JSON-serialize cards field for ChromaDB
+            if "cards" in current and isinstance(current["cards"], list):
+                current["cards"] = json.dumps(current["cards"])
+
+            # Filter out None values - ChromaDB doesn't accept them
+            current = {k: v for k, v in current.items() if v is not None}
+
             self.decks.update(
                 ids=[deck_id],
                 documents=[name],

@@ -1,13 +1,25 @@
 import { useState, useMemo } from 'react';
 import { useDeck } from '../context/DeckContext';
+import { api } from '../api/client';
 import Button from './common/Button';
 import InvestigatorPicker from './InvestigatorPicker';
+import DeckListModal from './DeckListModal';
 import './DeckBuilder.css';
 
 export default function DeckBuilder({ onCardClick }) {
-  const { activeDeck, selectedInvestigator, addCard, removeCard } = useDeck();
+  const {
+    activeDeck,
+    setActiveDeck,
+    selectedInvestigator,
+    setSelectedInvestigator,
+    addCard,
+    removeCard,
+    clearDeck,
+  } = useDeck();
   const [groupBy, setGroupBy] = useState('cost');
   const [showInvestigatorPicker, setShowInvestigatorPicker] = useState(false);
+  const [showDeckList, setShowDeckList] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Helper function to determine slot/function category
   const determineSlot = (card) => {
@@ -129,6 +141,108 @@ export default function DeckBuilder({ onCardClick }) {
     e.dataTransfer.dropEffect = 'copy';
   };
 
+  // Deck management functions
+  const handleNewDeck = () => {
+    const name = prompt('Enter deck name:', 'New Deck');
+    if (name) {
+      setActiveDeck({
+        id: null, // null ID means it's a new deck
+        name,
+        investigator_id: selectedInvestigator?.id || null,
+        investigator_name: selectedInvestigator?.name || null,
+        investigator_faction: selectedInvestigator?.faction || null,
+        cards: [],
+        archetype: 'balanced',
+        notes: '',
+      });
+    }
+  };
+
+  const handleSaveDeck = async () => {
+    if (!activeDeck) return;
+
+    // Prompt for name if untitled
+    let deckName = activeDeck.name;
+    if (!deckName || deckName === 'Untitled Deck') {
+      deckName = prompt('Enter deck name:', 'My Deck');
+      if (!deckName) return;
+    }
+
+    setSaving(true);
+    try {
+      const deckData = {
+        name: deckName,
+        investigator_code: activeDeck.investigator_id || selectedInvestigator?.id,
+        investigator_name: activeDeck.investigator_name || selectedInvestigator?.name,
+        cards: activeDeck.cards.map(c => ({
+          code: c.code,
+          name: c.name || c.real_name,
+          quantity: c.quantity,
+          cost: c.cost,
+          type_name: c.type_name,
+          class_name: c.class_name,
+        })),
+        archetype: activeDeck.archetype || 'balanced',
+        notes: activeDeck.notes || '',
+      };
+
+      let savedDeck;
+      // Try to update if deck has an ID that looks like it's from the database
+      // Skip update for mock IDs (deck_*) and AI-generated IDs (ai-*)
+      const isExistingDeck = activeDeck.id &&
+        !activeDeck.id.startsWith('ai-') &&
+        !activeDeck.id.startsWith('deck_');
+
+      if (isExistingDeck) {
+        try {
+          // Try to update existing deck
+          savedDeck = await api.decks.update(activeDeck.id, deckData);
+        } catch (updateErr) {
+          // If update fails (deck doesn't exist), create new instead
+          console.log('Update failed, creating new deck instead');
+          savedDeck = await api.decks.create(deckData);
+        }
+      } else {
+        // Create new deck
+        savedDeck = await api.decks.create(deckData);
+      }
+
+      setActiveDeck({
+        ...activeDeck,
+        id: savedDeck.id,
+        name: deckName,
+      });
+      alert('Deck saved successfully!');
+    } catch (err) {
+      console.error('Failed to save deck:', err);
+      alert('Failed to save deck. Make sure the backend is running.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLoadDeck = (deck) => {
+    // Convert backend deck format to frontend format
+    setActiveDeck({
+      id: deck.id,
+      name: deck.name,
+      investigator_id: deck.investigator_code,
+      investigator_name: deck.investigator_name,
+      investigator_faction: deck.investigator_faction,
+      cards: deck.cards || [],
+      archetype: deck.archetype,
+      notes: deck.notes,
+    });
+    // Update investigator if deck has one
+    if (deck.investigator_name) {
+      setSelectedInvestigator({
+        id: deck.investigator_code,
+        name: deck.investigator_name,
+        faction: deck.investigator_faction,
+      });
+    }
+  };
+
   // Display name - prefer selected investigator, fall back to deck investigator
   const displayInvestigator = selectedInvestigator || (activeDeck?.investigator_name ? {
     name: activeDeck.investigator_name,
@@ -142,9 +256,17 @@ export default function DeckBuilder({ onCardClick }) {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        <div className="deck-toolbar">
+          <Button variant="primary" onClick={handleNewDeck}>
+            New Deck
+          </Button>
+          <Button variant="ghost" onClick={() => setShowDeckList(true)}>
+            Load Deck
+          </Button>
+        </div>
         <div className="empty-state">
           <h3>No Active Deck</h3>
-          <p>Start by selecting an investigator, then create your deck.</p>
+          <p>Create a new deck or load an existing one to get started.</p>
           <div className="investigator-selection">
             {displayInvestigator ? (
               <div className="selected-investigator">
@@ -161,7 +283,7 @@ export default function DeckBuilder({ onCardClick }) {
               </div>
             ) : (
               <Button
-                variant="primary"
+                variant="secondary"
                 onClick={() => setShowInvestigatorPicker(true)}
               >
                 Select Investigator
@@ -173,16 +295,36 @@ export default function DeckBuilder({ onCardClick }) {
           isOpen={showInvestigatorPicker}
           onClose={() => setShowInvestigatorPicker(false)}
         />
+        <DeckListModal
+          isOpen={showDeckList}
+          onClose={() => setShowDeckList(false)}
+          onSelect={handleLoadDeck}
+        />
       </div>
     );
   }
 
   return (
-    <div 
+    <div
       className="deck-builder"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      <div className="deck-toolbar">
+        <Button variant="ghost" onClick={handleNewDeck}>
+          New
+        </Button>
+        <Button variant="ghost" onClick={() => setShowDeckList(true)}>
+          Load
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleSaveDeck}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
+      </div>
       <div className="deck-header">
         <div>
           <h2>{activeDeck.name || 'Untitled Deck'}</h2>
@@ -218,6 +360,11 @@ export default function DeckBuilder({ onCardClick }) {
       <InvestigatorPicker
         isOpen={showInvestigatorPicker}
         onClose={() => setShowInvestigatorPicker(false)}
+      />
+      <DeckListModal
+        isOpen={showDeckList}
+        onClose={() => setShowDeckList(false)}
+        onSelect={handleLoadDeck}
       />
 
       <div className="deck-controls">
