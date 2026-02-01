@@ -9,7 +9,11 @@ export function ChatProvider({ children }) {
   const [error, setError] = useState(null);
 
   // Send message to AI agent
-  const sendMessage = async (message, deckId = null) => {
+  // Options: { deckId, investigatorId, investigatorName, scenarioName, upgradeXp }
+  const sendMessage = async (message, options = {}) => {
+    // Support legacy signature: sendMessage(message, deckId)
+    const opts = typeof options === 'string' ? { deckId: options } : options;
+
     // Add user message to chat
     const userMessage = {
       id: Date.now(),
@@ -21,12 +25,19 @@ export function ChatProvider({ children }) {
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await api.chat.send({
+      // Build request payload
+      const payload = {
         message,
-        deck_id: deckId,
-      });
+        deck_id: opts.deckId || null,
+        investigator_id: opts.investigatorId || null,
+        investigator_name: opts.investigatorName || null,
+        scenario_name: opts.scenarioName || null,
+        upgrade_xp: opts.upgradeXp ?? null,
+      };
+
+      const response = await api.chat.send(payload);
 
       // Add AI response to chat
       // Backend returns: reply, structured_data, agents_consulted
@@ -65,17 +76,17 @@ export function ChatProvider({ children }) {
     setError(null);
   };
 
-  // Quick actions
-  const analyzeDeck = (deckId) => {
-    return sendMessage('Analyze this deck and provide recommendations', deckId);
+  // Quick actions - accept options object for context
+  const analyzeDeck = (options = {}) => {
+    return sendMessage('Analyze this deck and provide recommendations', options);
   };
 
-  const suggestSwaps = (deckId) => {
-    return sendMessage('Suggest card swaps to improve this deck', deckId);
+  const suggestSwaps = (options = {}) => {
+    return sendMessage('Suggest card swaps to improve this deck', options);
   };
 
-  const runSimulation = (deckId) => {
-    return sendMessage('Run a simulation on this deck', deckId);
+  const runSimulation = (options = {}) => {
+    return sendMessage('Run a simulation on this deck', options);
   };
 
   const value = {

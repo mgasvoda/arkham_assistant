@@ -113,6 +113,7 @@ export function DeckProvider({ children }) {
 
   const value = {
     activeDeck,
+    setActiveDeck,
     selectedInvestigator,
     loading,
     error,
