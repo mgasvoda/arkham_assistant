@@ -757,7 +757,17 @@ Keep the response focused and concise while being comprehensive."""
                 response = subagent.query(query, context)
             elif agent_type == SubagentType.STATE:
                 # StateAgent uses analyze() with StateQuery
-                card_list = request.deck_cards if request.deck_cards else []
+                # Convert deck_cards dict to list format if needed
+                deck_cards = request.deck_cards
+                if isinstance(deck_cards, dict):
+                    card_list = []
+                    for card_id, count in deck_cards.items():
+                        for _ in range(count):
+                            card_list.append(card_id)
+                elif deck_cards:
+                    card_list = list(deck_cards)
+                else:
+                    card_list = []
                 state_query = StateQuery(
                     card_list=card_list,
                     investigator_id=request.investigator_id or "",

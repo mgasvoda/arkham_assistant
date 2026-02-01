@@ -97,7 +97,7 @@ export const api = {
   },
   
   chat: {
-    send: (data) => post('/chat', data),
+    send: (data) => post('/chat/', data),
   },
 };
 

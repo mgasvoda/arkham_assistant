@@ -30,6 +30,10 @@ class ChatMessage(BaseModel):
         default=None,
         description="Deck ID for context"
     )
+    deck_cards: list[str] | dict[str, int] | None = Field(
+        default=None,
+        description="Card IDs or card data in the deck (use when deck is local)"
+    )
     investigator_id: str | None = Field(
         default=None,
         description="Investigator ID for context"
@@ -107,6 +111,8 @@ async def chat(message: ChatMessage) -> ChatResponse:
         context["scenario_name"] = message.scenario_name
     if message.upgrade_xp is not None:
         context["upgrade_xp"] = message.upgrade_xp
+    if message.deck_cards:
+        context["deck_cards"] = message.deck_cards
 
     try:
         result = process_chat_message(

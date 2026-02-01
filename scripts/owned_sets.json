@@ -1,6 +1,27 @@
 {
   "owned_packs": [
-    "core"
-  ]
+    "core",
+    "dwl",
+    "tmm",
+    "tece",
+    "bota",
+    "uau",
+    "wda",
+    "litas",
+    "ptc",
+    "eotp",
+    "tuo",
+    "apot",
+    "tpm",
+    "bsr",
+    "dca",
+    "tfa",
+    "tof",
+    "tbb",
+    "hote",
+    "tcoa",
+    "tdoy",
+    "sha"
+  ],
+  "description": "Core Set + Dunwich Legacy cycle + Path to Carcosa cycle + Forgotten Age cycle"
 }
-

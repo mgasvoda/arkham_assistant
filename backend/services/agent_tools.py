@@ -117,14 +117,19 @@ def get_deck(deck_id: str) -> dict:
     return deck
 
 
-def run_simulation_tool(deck_id: str, n_trials: int = 1000) -> dict:
+def run_simulation_tool(
+    deck_id: str | None = None,
+    card_list: list[str] | dict[str, int] | None = None,
+    n_trials: int = 1000,
+) -> dict:
     """Execute deck simulation via simulator service.
 
     This tool runs Monte Carlo simulations to analyze deck performance,
     including draw consistency, resource curves, and key card timing.
 
     Args:
-        deck_id: ID of deck to simulate
+        deck_id: ID of deck to simulate (for stored decks)
+        card_list: Card list as IDs or {id: count} dict (for local decks)
         n_trials: Number of simulation trials (default 1000)
 
     Returns:
@@ -138,9 +143,21 @@ def run_simulation_tool(deck_id: str, n_trials: int = 1000) -> dict:
     """
     from backend.services.simulator import run_simulation
 
+    # Convert dict card_list to flat list if needed
+    expanded_card_list = None
+    if card_list:
+        if isinstance(card_list, dict):
+            expanded_card_list = []
+            for card_id, count in card_list.items():
+                for _ in range(count):
+                    expanded_card_list.append(card_id)
+        else:
+            expanded_card_list = list(card_list)
+
     try:
         return run_simulation(
             deck_id=deck_id,
+            card_list=expanded_card_list,
             n_trials=n_trials,
             config={"mulligan_strategy": "aggressive"},
         )
@@ -486,7 +503,14 @@ class DeckSummaryInput(BaseModel):
 class SimulationInput(BaseModel):
     """Input schema for running deck simulations."""
 
-    deck_id: str = Field(description="The unique identifier of the deck to simulate")
+    deck_id: str | None = Field(
+        default=None,
+        description="The unique identifier of the deck to simulate (use if deck is stored)"
+    )
+    card_list: list[str] | dict[str, int] | None = Field(
+        default=None,
+        description="Card list as IDs or {id: count} dict (use for local decks not in database)"
+    )
     n_trials: int = Field(
         default=1000,
         description="Number of simulation trials to run (default: 1000)",
@@ -576,14 +600,23 @@ def deck_summary_tool(deck_id: str) -> str:
 
 
 @tool("run_simulation", args_schema=SimulationInput)
-def simulation_tool(deck_id: str, n_trials: int = 1000) -> str:
+def simulation_tool(
+    deck_id: str | None = None,
+    card_list: list[str] | dict[str, int] | None = None,
+    n_trials: int = 1000,
+) -> str:
     """Run Monte Carlo simulations to analyze deck performance.
 
     Executes multiple random trials to analyze opening hand consistency,
     mulligan effectiveness, and key card reliability. Returns metrics like
     average setup time, success rate, and per-card statistics.
+
+    Use deck_id for decks stored in the database, or card_list for local
+    decks that aren't stored (e.g., AI-generated proposals).
     """
-    result = run_simulation_tool(deck_id, n_trials)
+    if not deck_id and not card_list:
+        return json.dumps({"error": "Either deck_id or card_list must be provided"})
+    result = run_simulation_tool(deck_id=deck_id, card_list=card_list, n_trials=n_trials)
     return json.dumps(result, indent=2)
 
 

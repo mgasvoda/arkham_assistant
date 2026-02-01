@@ -31,6 +31,7 @@ export function ChatProvider({ children }) {
       const payload = {
         message,
         deck_id: opts.deckId || null,
+        deck_cards: opts.deckCards || null,
         investigator_id: opts.investigatorId || null,
         investigator_name: opts.investigatorName || null,
         scenario_name: opts.scenarioName || null,

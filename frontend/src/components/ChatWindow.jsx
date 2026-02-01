@@ -64,13 +64,30 @@ export default function ChatWindow({ onOpenSimulation }) {
     : [];
 
   // Build context options for API requests
-  const buildContextOptions = () => ({
-    deckId: activeDeck?.id,
-    investigatorId: selectedInvestigator?.id || activeDeck?.investigator_id,
-    investigatorName: selectedInvestigator?.name || activeDeck?.investigator_name,
-    upgradeXp: upgradeXp ? parseInt(upgradeXp, 10) : null,
-    scenarioName: scenarioName || null,
-  });
+  const buildContextOptions = () => {
+    // Extract card IDs from active deck if available
+    let deckCards = null;
+    if (activeDeck?.cards && Array.isArray(activeDeck.cards)) {
+      // Convert cards array to dict format: { card_id: count }
+      deckCards = {};
+      activeDeck.cards.forEach(card => {
+        const cardId = card.card_id || card.id || card.code;
+        const count = card.count || card.quantity || 1;
+        if (cardId) {
+          deckCards[cardId] = (deckCards[cardId] || 0) + count;
+        }
+      });
+    }
+
+    return {
+      deckId: activeDeck?.id,
+      deckCards,
+      investigatorId: selectedInvestigator?.id || activeDeck?.investigator_id,
+      investigatorName: selectedInvestigator?.name || activeDeck?.investigator_name,
+      upgradeXp: upgradeXp ? parseInt(upgradeXp, 10) : null,
+      scenarioName: scenarioName || null,
+    };
+  };
 
   // Handle scenario selection from suggestions
   const handleSelectScenario = (scenario) => {
