@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useDeck } from '../context/DeckContext';
 import Button from './common/Button';
+import InvestigatorPicker from './InvestigatorPicker';
 import './DeckBuilder.css';
 
 export default function DeckBuilder({ onCardClick }) {
-  const { activeDeck, addCard, removeCard } = useDeck();
+  const { activeDeck, selectedInvestigator, addCard, removeCard } = useDeck();
   const [groupBy, setGroupBy] = useState('cost');
+  const [showInvestigatorPicker, setShowInvestigatorPicker] = useState(false);
 
   // Helper function to determine slot/function category
   const determineSlot = (card) => {
@@ -127,17 +129,50 @@ export default function DeckBuilder({ onCardClick }) {
     e.dataTransfer.dropEffect = 'copy';
   };
 
+  // Display name - prefer selected investigator, fall back to deck investigator
+  const displayInvestigator = selectedInvestigator || (activeDeck?.investigator_name ? {
+    name: activeDeck.investigator_name,
+    faction: activeDeck.investigator_faction,
+  } : null);
+
   if (!activeDeck) {
     return (
-      <div 
+      <div
         className="deck-builder"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
         <div className="empty-state">
           <h3>No Active Deck</h3>
-          <p>Create a new deck or load an existing one to get started.</p>
+          <p>Start by selecting an investigator, then create your deck.</p>
+          <div className="investigator-selection">
+            {displayInvestigator ? (
+              <div className="selected-investigator">
+                <span className={`investigator-badge faction-${(displayInvestigator.faction || 'neutral').toLowerCase()}`}>
+                  {displayInvestigator.name}
+                </span>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  onClick={() => setShowInvestigatorPicker(true)}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => setShowInvestigatorPicker(true)}
+              >
+                Select Investigator
+              </Button>
+            )}
+          </div>
         </div>
+        <InvestigatorPicker
+          isOpen={showInvestigatorPicker}
+          onClose={() => setShowInvestigatorPicker(false)}
+        />
       </div>
     );
   }
@@ -151,14 +186,39 @@ export default function DeckBuilder({ onCardClick }) {
       <div className="deck-header">
         <div>
           <h2>{activeDeck.name || 'Untitled Deck'}</h2>
-          {activeDeck.investigator_name && (
-            <p className="investigator">{activeDeck.investigator_name}</p>
-          )}
+          <div className="investigator-row">
+            {displayInvestigator ? (
+              <>
+                <span className={`investigator-badge faction-${(displayInvestigator.faction || 'neutral').toLowerCase()}`}>
+                  {displayInvestigator.name}
+                </span>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  onClick={() => setShowInvestigatorPicker(true)}
+                >
+                  Change
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="small"
+                variant="primary"
+                onClick={() => setShowInvestigatorPicker(true)}
+              >
+                Select Investigator
+              </Button>
+            )}
+          </div>
         </div>
         <div className="deck-stats-summary">
           <span className="stat-badge">{stats.totalCards} cards</span>
         </div>
       </div>
+      <InvestigatorPicker
+        isOpen={showInvestigatorPicker}
+        onClose={() => setShowInvestigatorPicker(false)}
+      />
 
       <div className="deck-controls">
         <label>

@@ -361,3 +361,56 @@
   }
 }
 
+/* Investigator selection styles */
+.investigator-selection {
+  margin-top: 1.5rem;
+}
+
+.investigator-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.selected-investigator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.investigator-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: #374151;
+  color: #f9fafb;
+  border-left: 3px solid #6b7280;
+}
+
+.investigator-badge.faction-guardian {
+  border-left-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.investigator-badge.faction-seeker {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.investigator-badge.faction-rogue {
+  border-left-color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.investigator-badge.faction-mystic {
+  border-left-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.investigator-badge.faction-survivor {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
