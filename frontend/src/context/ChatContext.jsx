@@ -29,12 +29,13 @@ export function ChatProvider({ children }) {
       });
 
       // Add AI response to chat
+      // Backend returns: reply, structured_data, agents_consulted
       const aiMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: response.response || response.summary || 'No response',
-        recommendations: response.recommendations || [],
-        simulation: response.simulation || null,
+        content: response.reply || 'No response',
+        structuredData: response.structured_data || null,
+        agentsConsulted: response.agents_consulted || [],
         timestamp: new Date().toISOString(),
       };
       
