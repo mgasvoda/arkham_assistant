@@ -5,63 +5,13 @@ import Button from './common/Button';
 import DeckProposal from './DeckProposal';
 import './ChatWindow.css';
 
-// Common Arkham Horror scenarios for autocomplete
-const COMMON_SCENARIOS = [
-  'The Gathering',
-  'The Midnight Masks',
-  'The Devourer Below',
-  'Extracurricular Activity',
-  'The House Always Wins',
-  'The Miskatonic Museum',
-  'The Essex County Express',
-  'Blood on the Altar',
-  'Undimensioned and Unseen',
-  'Where Doom Awaits',
-  'Lost in Time and Space',
-  'Curtain Call',
-  'The Last King',
-  'Echoes of the Past',
-  'The Unspeakable Oath',
-  'A Phantom of Truth',
-  'The Pallid Mask',
-  'Black Stars Rise',
-  'Dim Carcosa',
-  'The Untamed Wilds',
-  'The Doom of Eztli',
-  'Threads of Fate',
-  'The Boundary Beyond',
-  'Heart of the Elders',
-  'The City of Archives',
-  'The Depths of Yoth',
-  'Shattered Aeons',
-  'Disappearance at the Twilight Estate',
-  'The Witching Hour',
-  'At Death\'s Doorstep',
-  'The Secret Name',
-  'The Wages of Sin',
-  'For the Greater Good',
-  'Union and Disillusion',
-  'In the Clutches of Chaos',
-  'Before the Black Throne',
-];
-
 export default function ChatWindow({ onOpenSimulation }) {
   const [input, setInput] = useState('');
   const [upgradeXp, setUpgradeXp] = useState('');
-  const [scenarioName, setScenarioName] = useState('');
-  const [showScenarioSuggestions, setShowScenarioSuggestions] = useState(false);
   const [dismissedProposals, setDismissedProposals] = useState(new Set());
   const messagesEndRef = useRef(null);
-  const scenarioInputRef = useRef(null);
   const { messages, loading, sendMessage, analyzeDeck, suggestSwaps, runSimulation } = useChat();
   const { activeDeck, selectedInvestigator, setActiveDeck, setSelectedInvestigator } = useDeck();
-
-  // Filter scenarios based on input
-  const filteredScenarios = scenarioName
-    ? COMMON_SCENARIOS.filter(s =>
-        s.toLowerCase().includes(scenarioName.toLowerCase())
-      ).slice(0, 5)
-    : [];
 
   // Build context options for API requests
   const buildContextOptions = () => ({
@@ -69,25 +19,7 @@ export default function ChatWindow({ onOpenSimulation }) {
     investigatorId: selectedInvestigator?.id || activeDeck?.investigator_id,
     investigatorName: selectedInvestigator?.name || activeDeck?.investigator_name,
     upgradeXp: upgradeXp ? parseInt(upgradeXp, 10) : null,
-    scenarioName: scenarioName || null,
   });
-
-  // Handle scenario selection from suggestions
-  const handleSelectScenario = (scenario) => {
-    setScenarioName(scenario);
-    setShowScenarioSuggestions(false);
-  };
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (scenarioInputRef.current && !scenarioInputRef.current.contains(e.target)) {
-        setShowScenarioSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Helper to detect if structuredData contains a NewDeckResponse
   const isNewDeckResponse = (structuredData) => {
@@ -275,52 +207,21 @@ export default function ChatWindow({ onOpenSimulation }) {
 
       <div className="chat-input-container">
         {activeDeck && (
-          <div className="context-inputs">
-            <div className="context-row">
-              <label className="context-label">
-                Available XP:
-                <input
-                  type="number"
-                  className="xp-input"
-                  min="0"
-                  max="50"
-                  value={upgradeXp}
-                  onChange={(e) => setUpgradeXp(e.target.value)}
-                  placeholder="0"
-                  disabled={loading}
-                />
-              </label>
-              <div className="scenario-input-wrapper" ref={scenarioInputRef}>
-                <label className="context-label">
-                  Scenario:
-                  <input
-                    type="text"
-                    className="scenario-input"
-                    value={scenarioName}
-                    onChange={(e) => {
-                      setScenarioName(e.target.value);
-                      setShowScenarioSuggestions(true);
-                    }}
-                    onFocus={() => setShowScenarioSuggestions(true)}
-                    placeholder="e.g., The Gathering"
-                    disabled={loading}
-                  />
-                </label>
-                {showScenarioSuggestions && filteredScenarios.length > 0 && (
-                  <ul className="scenario-suggestions">
-                    {filteredScenarios.map(scenario => (
-                      <li
-                        key={scenario}
-                        onClick={() => handleSelectScenario(scenario)}
-                      >
-                        {scenario}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-            <span className="context-hint">Set context for scenario-specific advice</span>
+          <div className="xp-input-row">
+            <label className="xp-label">
+              Available XP:
+              <input
+                type="number"
+                className="xp-input"
+                min="0"
+                max="50"
+                value={upgradeXp}
+                onChange={(e) => setUpgradeXp(e.target.value)}
+                placeholder="0"
+                disabled={loading}
+              />
+            </label>
+            <span className="xp-hint">Set for upgrade recommendations</span>
           </div>
         )}
         <div className="input-row">
