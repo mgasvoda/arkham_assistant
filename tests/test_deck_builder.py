@@ -17,8 +17,11 @@ from backend.models.deck_builder_models import (
     CardSelection,
     DeckBuilderSubagentResult,
     DeckBuildGoals,
+    DeckRecommendationResponse,
+    DeckSummary,
     InvestigatorConstraints,
     NewDeckResponse,
+    Recommendation,
 )
 from backend.services.orchestrator import (
     DECK_CREATION_KEYWORDS,
@@ -792,3 +795,368 @@ class TestSubagentResultTracking:
 
         assert result.success is False
         assert "not found" in result.summary
+
+
+# =============================================================================
+# DeckSummary Model Tests
+# =============================================================================
+
+
+class TestDeckSummary:
+    """Tests for DeckSummary model."""
+
+    def test_minimal_summary(self):
+        """Should create minimal summary with defaults."""
+        summary = DeckSummary()
+        assert summary.card_count == 0
+        assert summary.curve == {}
+        assert summary.type_distribution == {}
+        assert summary.class_distribution == {}
+        assert summary.key_cards == []
+
+    def test_full_summary(self):
+        """Should create summary with all fields."""
+        summary = DeckSummary(
+            card_count=30,
+            curve={"0": 4, "1": 6, "2": 8, "3": 6, "4": 4, "5": 2},
+            type_distribution={"Asset": 15, "Event": 10, "Skill": 5},
+            class_distribution={"Guardian": 20, "Neutral": 10},
+            key_cards=["Machete", ".45 Automatic", "Beat Cop"],
+        )
+        assert summary.card_count == 30
+        assert summary.curve["2"] == 8
+        assert summary.type_distribution["Asset"] == 15
+        assert "Guardian" in summary.class_distribution
+        assert len(summary.key_cards) == 3
+
+    def test_to_readable(self):
+        """Should format summary as readable text."""
+        summary = DeckSummary(
+            card_count=30,
+            curve={"0": 4, "2": 10},
+            type_distribution={"Asset": 15, "Event": 15},
+            class_distribution={"Guardian": 25, "Neutral": 5},
+            key_cards=["Machete", "Beat Cop"],
+        )
+        readable = summary.to_readable()
+
+        assert "**Card Count**: 30" in readable
+        assert "**Resource Curve**:" in readable
+        assert "**Types**:" in readable
+        assert "**Classes**:" in readable
+        assert "**Key Cards**: Machete, Beat Cop" in readable
+
+
+# =============================================================================
+# Recommendation Model Tests
+# =============================================================================
+
+
+class TestRecommendation:
+    """Tests for Recommendation model."""
+
+    def test_add_recommendation(self):
+        """Should create add recommendation."""
+        rec = Recommendation(
+            action="add",
+            card_id="01016",
+            card_name="Machete",
+            xp_cost=0,
+            priority=1,
+            reason="Core combat weapon",
+        )
+        assert rec.action == "add"
+        assert rec.card_id == "01016"
+        assert rec.remove_card_id is None
+
+    def test_swap_recommendation(self):
+        """Should create swap recommendation with remove card."""
+        rec = Recommendation(
+            action="swap",
+            card_id="01016",
+            card_name="Machete",
+            remove_card_id="01017",
+            remove_card_name="Knife",
+            xp_cost=0,
+            priority=2,
+            reason="Better damage output",
+        )
+        assert rec.action == "swap"
+        assert rec.remove_card_id == "01017"
+        assert rec.remove_card_name == "Knife"
+
+    def test_upgrade_recommendation_with_xp(self):
+        """Should create upgrade recommendation with XP cost."""
+        rec = Recommendation(
+            action="upgrade",
+            card_id="01016",
+            card_name="Machete (2)",
+            remove_card_id="01015",
+            remove_card_name="Machete",
+            xp_cost=2,
+            priority=1,
+            reason="Higher level version",
+        )
+        assert rec.action == "upgrade"
+        assert rec.xp_cost == 2
+
+    def test_priority_bounds(self):
+        """Should enforce priority between 1 and 10."""
+        with pytest.raises(ValidationError):
+            Recommendation(
+                action="add",
+                card_id="01016",
+                card_name="Test",
+                priority=0,
+                reason="Test",
+            )
+
+        with pytest.raises(ValidationError):
+            Recommendation(
+                action="add",
+                card_id="01016",
+                card_name="Test",
+                priority=11,
+                reason="Test",
+            )
+
+    def test_to_readable_add(self):
+        """Should format add recommendation."""
+        rec = Recommendation(
+            action="add",
+            card_id="01016",
+            card_name="Machete",
+            priority=1,
+            reason="Best combat weapon",
+        )
+        readable = rec.to_readable()
+        assert "Add **Machete**" in readable
+        assert "Best combat weapon" in readable
+
+    def test_to_readable_swap(self):
+        """Should format swap recommendation."""
+        rec = Recommendation(
+            action="swap",
+            card_id="01016",
+            card_name="Machete",
+            remove_card_id="01017",
+            remove_card_name="Knife",
+            priority=1,
+            reason="Better damage",
+        )
+        readable = rec.to_readable()
+        assert "Swap **Knife** → **Machete**" in readable
+
+    def test_to_readable_with_xp(self):
+        """Should include XP cost in readable output."""
+        rec = Recommendation(
+            action="upgrade",
+            card_id="01016",
+            card_name="Machete (2)",
+            remove_card_id="01015",
+            remove_card_name="Machete",
+            xp_cost=2,
+            priority=1,
+            reason="Upgrade",
+        )
+        readable = rec.to_readable()
+        assert "(2 XP)" in readable
+
+
+# =============================================================================
+# DeckRecommendationResponse Model Tests
+# =============================================================================
+
+
+class TestDeckRecommendationResponse:
+    """Tests for DeckRecommendationResponse model."""
+
+    def test_new_deck_response(self):
+        """Should create new deck recommendation response."""
+        response = DeckRecommendationResponse(
+            investigator_id="01001",
+            request_type="new_deck",
+            original_message="Build me a combat deck",
+            proposed_deck_summary=DeckSummary(card_count=30),
+            recommendations=[
+                Recommendation(
+                    action="add",
+                    card_id="01016",
+                    card_name="Machete",
+                    priority=1,
+                    reason="Core weapon",
+                )
+            ],
+            reasoning="Combat-focused deck",
+            subagents_consulted=["rules", "action_space"],
+            confidence_score=0.85,
+        )
+        assert response.request_type == "new_deck"
+        assert response.current_deck_summary is None
+        assert len(response.recommendations) == 1
+        assert response.confidence_score == 0.85
+
+    def test_upgrade_response_with_current_deck(self):
+        """Should create upgrade response with current deck summary."""
+        response = DeckRecommendationResponse(
+            investigator_id="01001",
+            request_type="upgrade",
+            original_message="Upgrade my deck with 5 XP",
+            current_deck_summary=DeckSummary(card_count=30),
+            proposed_deck_summary=DeckSummary(card_count=30),
+            recommendations=[
+                Recommendation(
+                    action="upgrade",
+                    card_id="01016",
+                    card_name="Machete (2)",
+                    remove_card_id="01015",
+                    remove_card_name="Machete",
+                    xp_cost=2,
+                    priority=1,
+                    reason="Better version",
+                )
+            ],
+            reasoning="Prioritizing core upgrades",
+        )
+        assert response.request_type == "upgrade"
+        assert response.current_deck_summary is not None
+        assert response.recommendations[0].xp_cost == 2
+
+    def test_error_response(self):
+        """Should create error response."""
+        response = DeckRecommendationResponse.error_response(
+            error_message="Failed to analyze deck",
+            investigator_id="01001",
+            original_message="Help me upgrade",
+        )
+        assert response.confidence_score == 0.0
+        assert "Failed to analyze deck" in response.reasoning
+        assert "Failed to analyze deck" in response.warnings
+
+    def test_to_readable(self):
+        """Should format response as readable text."""
+        response = DeckRecommendationResponse(
+            investigator_id="01001",
+            request_type="new_deck",
+            original_message="Build deck",
+            proposed_deck_summary=DeckSummary(
+                card_count=30,
+                key_cards=["Machete"],
+            ),
+            recommendations=[
+                Recommendation(
+                    action="add",
+                    card_id="01016",
+                    card_name="Machete",
+                    priority=1,
+                    reason="Core weapon",
+                ),
+                Recommendation(
+                    action="add",
+                    card_id="01017",
+                    card_name="Beat Cop",
+                    priority=2,
+                    reason="Ally support",
+                ),
+            ],
+            reasoning="Combat strategy",
+            confidence_score=0.8,
+        )
+        readable = response.to_readable()
+
+        assert "# Deck Recommendations" in readable
+        assert "Combat strategy" in readable
+        assert "## Recommendations" in readable
+        assert "Machete" in readable
+        assert "**Confidence**: 80%" in readable
+
+    def test_to_readable_with_xp_total(self):
+        """Should show total XP cost in readable output."""
+        response = DeckRecommendationResponse(
+            investigator_id="01001",
+            request_type="upgrade",
+            original_message="Upgrade deck",
+            proposed_deck_summary=DeckSummary(card_count=30),
+            recommendations=[
+                Recommendation(
+                    action="upgrade",
+                    card_id="01016",
+                    card_name="Card A",
+                    xp_cost=3,
+                    priority=1,
+                    reason="Upgrade",
+                ),
+                Recommendation(
+                    action="upgrade",
+                    card_id="01017",
+                    card_name="Card B",
+                    xp_cost=2,
+                    priority=2,
+                    reason="Upgrade",
+                ),
+            ],
+            reasoning="XP spending plan",
+        )
+        readable = response.to_readable()
+        assert "**Total XP Cost**: 5" in readable
+
+
+# =============================================================================
+# NewDeckResponse.to_readable Tests
+# =============================================================================
+
+
+class TestNewDeckResponseReadable:
+    """Tests for NewDeckResponse.to_readable() method."""
+
+    def test_to_readable_basic(self):
+        """Should format deck as readable text."""
+        response = NewDeckResponse(
+            deck_name="Roland's Assault Force",
+            investigator_id="01001",
+            investigator_name="Roland Banks",
+            cards=[
+                CardSelection(
+                    card_id="01016",
+                    name="Machete",
+                    quantity=2,
+                    reason="Primary weapon",
+                    category="combat",
+                ),
+                CardSelection(
+                    card_id="01030",
+                    name="Dr. Milan Christopher",
+                    quantity=1,
+                    reason="Resource generation",
+                    category="economy",
+                ),
+            ],
+            total_cards=30,
+            reasoning="Combat-focused build",
+            archetype="Combat Guardian",
+        )
+        readable = response.to_readable()
+
+        assert "# Roland's Assault Force" in readable
+        assert "**Investigator**: Roland Banks" in readable
+        assert "**Archetype**: Combat Guardian" in readable
+        assert "## Strategy" in readable
+        assert "Combat-focused build" in readable
+        assert "### Combat" in readable
+        assert "Machete x2" in readable
+        assert "### Economy" in readable
+
+    def test_to_readable_with_warnings(self):
+        """Should include warnings in output."""
+        response = NewDeckResponse(
+            deck_name="Test Deck",
+            investigator_id="01001",
+            investigator_name="Roland Banks",
+            warnings=["Deck is incomplete", "Missing card draw"],
+            archetype="Test",
+        )
+        readable = response.to_readable()
+
+        assert "## Warnings" in readable
+        assert "Deck is incomplete" in readable
+        assert "Missing card draw" in readable
