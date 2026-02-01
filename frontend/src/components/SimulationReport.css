@@ -37,6 +37,30 @@
   color: #4f46e5;
 }
 
+.sim-warnings {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.sim-warnings h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: #ef4444;
+}
+
+.sim-warnings ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.sim-warnings li {
+  font-size: 0.875rem;
+  color: #dc2626;
+  margin-bottom: 0.25rem;
+}
+
 .sim-section {
   display: flex;
   flex-direction: column;
