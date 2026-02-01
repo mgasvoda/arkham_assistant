@@ -28,6 +28,8 @@ from backend.models.deck_builder_models import (
     DeckBuildGoals,
     InvestigatorConstraints,
     NewDeckResponse,
+    UpgradeRecommendation,
+    UpgradeResponse,
 )
 from backend.models.subagent_models import SubagentResponse
 from backend.services.llm_config import get_llm_config
@@ -58,31 +60,96 @@ class SubagentType(str, Enum):
 # Keywords that suggest which subagents should be consulted
 ROUTING_KEYWORDS = {
     SubagentType.RULES: [
-        "legal", "can i include", "allowed", "restriction", "taboo",
-        "signature", "weakness", "class access", "xp cost", "level",
-        "deckbuilding rule", "deck construction",
+        "legal",
+        "can i include",
+        "allowed",
+        "restriction",
+        "taboo",
+        "signature",
+        "weakness",
+        "class access",
+        "xp cost",
+        "level",
+        "deckbuilding rule",
+        "deck construction",
     ],
     SubagentType.STATE: [
-        "analyze", "deck composition", "curve", "gaps", "missing",
-        "strengths", "weaknesses", "synergy", "redundancy", "current deck",
-        "my deck", "what does my deck",
+        "analyze",
+        "deck composition",
+        "curve",
+        "gaps",
+        "missing",
+        "strengths",
+        "weaknesses",
+        "synergy",
+        "redundancy",
+        "current deck",
+        "my deck",
+        "what does my deck",
     ],
     SubagentType.ACTION_SPACE: [
-        "find cards", "search", "recommend", "suggest", "upgrade",
-        "replacement", "alternatives", "options", "cards that",
-        "what cards", "which cards",
+        "find cards",
+        "search",
+        "recommend",
+        "suggest",
+        "upgrade",
+        "replacement",
+        "alternatives",
+        "options",
+        "cards that",
+        "what cards",
+        "which cards",
     ],
     SubagentType.SCENARIO: [
-        "scenario", "prepare", "threats", "encounter", "treachery",
-        "enemy", "boss", "campaign", "mission", "before playing",
+        "scenario",
+        "prepare",
+        "threats",
+        "encounter",
+        "treachery",
+        "enemy",
+        "boss",
+        "campaign",
+        "mission",
+        "before playing",
     ],
 }
 
 # Keywords that suggest the user wants to create a new deck
 DECK_CREATION_KEYWORDS = [
-    "build me", "build a deck", "create a deck", "new deck",
-    "make me a deck", "start a new deck", "fresh deck",
-    "build for", "create for", "deck for", "make a deck",
+    "build me",
+    "build a deck",
+    "create a deck",
+    "new deck",
+    "make me a deck",
+    "start a new deck",
+    "fresh deck",
+    "build for",
+    "create for",
+    "deck for",
+    "make a deck",
+]
+
+# Keywords that suggest the user wants to upgrade an existing deck
+DECK_UPGRADE_KEYWORDS = [
+    "upgrade my deck",
+    "upgrade deck",
+    "upgrade the deck",
+    "spend xp",
+    "spend my xp",
+    "use xp",
+    "use my xp",
+    "improve my deck",
+    "improve the deck",
+    "improve deck",
+    "what should i upgrade",
+    "what to upgrade",
+    "upgrade suggestions",
+    "upgrade recommendations",
+    "upgrade options",
+    "upgrade path",
+    "xp upgrades",
+    "with my xp",
+    "with this xp",
 ]
 
 
@@ -107,39 +174,20 @@ class OrchestratorRequest(BaseModel):
     """
 
     message: str = Field(description="The user's message or question")
-    investigator_id: str | None = Field(
-        default=None,
-        description="Investigator ID for context"
-    )
-    investigator_name: str | None = Field(
-        default=None,
-        description="Investigator name for display"
-    )
-    deck_id: str | None = Field(
-        default=None,
-        description="Deck ID to analyze"
-    )
+    investigator_id: str | None = Field(default=None, description="Investigator ID for context")
+    investigator_name: str | None = Field(default=None, description="Investigator name for display")
+    deck_id: str | None = Field(default=None, description="Deck ID to analyze")
     deck_cards: list[str] | dict[str, int] | None = Field(
-        default=None,
-        description="Card IDs or card data in the deck"
+        default=None, description="Card IDs or card data in the deck"
     )
-    scenario_name: str | None = Field(
-        default=None,
-        description="Scenario being prepared for"
-    )
-    campaign_name: str | None = Field(
-        default=None,
-        description="Campaign name for context"
-    )
+    scenario_name: str | None = Field(default=None, description="Scenario being prepared for")
+    campaign_name: str | None = Field(default=None, description="Campaign name for context")
     upgrade_xp: int | None = Field(
         default=None,
         description="Available XP for upgrades",
         ge=0,
     )
-    owned_sets: list[str] | None = Field(
-        default=None,
-        description="List of owned expansion names"
-    )
+    owned_sets: list[str] | None = Field(default=None, description="List of owned expansion names")
 
 
 class SubagentResult(BaseModel):
@@ -155,10 +203,7 @@ class SubagentResult(BaseModel):
 
     agent_type: str = Field(description="The subagent type")
     query: str = Field(description="Query sent to the subagent")
-    response: SubagentResponse | None = Field(
-        default=None,
-        description="The subagent response"
-    )
+    response: SubagentResponse | None = Field(default=None, description="The subagent response")
     success: bool = Field(default=True, description="Whether query succeeded")
     error: str | None = Field(default=None, description="Error if failed")
 
@@ -177,26 +222,17 @@ class OrchestratorResponse(BaseModel):
 
     content: str = Field(description="Synthesized response content")
     recommendation: str | None = Field(
-        default=None,
-        description="Specific actionable recommendation"
+        default=None, description="Specific actionable recommendation"
     )
-    confidence: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Overall confidence score"
-    )
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Overall confidence score")
     subagent_results: list[SubagentResult] = Field(
-        default_factory=list,
-        description="Results from consulted subagents"
+        default_factory=list, description="Results from consulted subagents"
     )
     agents_consulted: list[str] = Field(
-        default_factory=list,
-        description="Subagent types consulted"
+        default_factory=list, description="Subagent types consulted"
     )
     metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional orchestration metadata"
+        default_factory=dict, description="Additional orchestration metadata"
     )
 
     @classmethod
@@ -293,6 +329,78 @@ class DeckBuilderState(BaseModel):
     error: str | None = None
 
 
+class UpgradeGoals(BaseModel):
+    """Extracted upgrade goals from user message.
+
+    Attributes:
+        primary_goal: Main upgrade goal (e.g., "better combat", "more willpower").
+        specific_requests: Specific upgrade requests from the message.
+        cards_to_upgrade: Specific cards mentioned for upgrade.
+        cards_to_remove: Specific cards mentioned for removal.
+        avoid_cards: Cards or types to avoid.
+    """
+
+    primary_goal: str = Field(default="general improvement", description="Main upgrade goal")
+    specific_requests: list[str] = Field(
+        default_factory=list, description="Specific upgrade requests"
+    )
+    cards_to_upgrade: list[str] = Field(
+        default_factory=list, description="Cards specifically mentioned for upgrade"
+    )
+    cards_to_remove: list[str] = Field(
+        default_factory=list, description="Cards specifically mentioned for removal"
+    )
+    avoid_cards: list[str] = Field(default_factory=list, description="Cards or types to avoid")
+
+
+class DeckUpgradeState(BaseModel):
+    """State for the deck upgrade LangGraph execution.
+
+    This state flows through upgrade pipeline nodes, tracking
+    current deck analysis, upgrade candidates, and recommendations.
+    """
+
+    # Input
+    request: OrchestratorRequest
+    context: dict[str, Any] = Field(default_factory=dict)
+
+    # Upgrade Goals
+    upgrade_goals: UpgradeGoals | None = None
+
+    # Current Deck Analysis (from StateAgent)
+    current_deck_cards: list[dict[str, Any]] = Field(default_factory=list)
+    deck_weaknesses: list[str] = Field(default_factory=list)
+    deck_strengths: list[str] = Field(default_factory=list)
+    upgrade_priority_cards: list[str] = Field(default_factory=list)
+
+    # Investigator Info
+    investigator_id: str = ""
+    investigator_name: str = ""
+
+    # Scenario Context (optional)
+    scenario_priorities: list[str] = Field(default_factory=list)
+
+    # XP Budget
+    available_xp: int = 0
+    spent_xp: int = 0
+
+    # Upgrade Candidates (from ActionSpaceAgent)
+    upgrade_candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+    # Generated Recommendations
+    recommendations: list[UpgradeRecommendation] = Field(default_factory=list)
+
+    # Warnings
+    warnings: list[str] = Field(default_factory=list)
+
+    # Subagent Results for transparency
+    subagent_results: list[DeckBuilderSubagentResult] = Field(default_factory=list)
+
+    # Output
+    response: UpgradeResponse | None = None
+    error: str | None = None
+
+
 # =============================================================================
 # Orchestrator Configuration
 # =============================================================================
@@ -337,7 +445,8 @@ class Orchestrator:
     """
 
     # Synthesis prompt for combining subagent responses
-    SYNTHESIS_PROMPT = """You are synthesizing responses from specialized subagents to answer a user's deckbuilding question.
+    SYNTHESIS_PROMPT = """You are synthesizing responses from specialized \
+subagents to answer a user's deckbuilding question.
 
 ## User's Question
 {user_message}
@@ -358,7 +467,8 @@ Synthesize the above information into a clear, actionable response that:
 4. Provides specific, actionable recommendations
 5. Explains the reasoning behind recommendations
 
-If subagents provided card suggestions, prioritize them by relevance and explain why each is recommended.
+If subagents provided card suggestions, prioritize them by relevance and \
+explain why each is recommended.
 If there are conflicting recommendations, explain the trade-offs.
 
 Keep the response focused and concise while being comprehensive."""
@@ -411,17 +521,13 @@ Keep the response focused and concise while being comprehensive."""
         """
         if agent_type not in self._subagents:
             if agent_type == SubagentType.RULES:
-                self._subagents[agent_type] = create_rules_agent(
-                    config=self.subagent_config
-                )
+                self._subagents[agent_type] = create_rules_agent(config=self.subagent_config)
             elif agent_type == SubagentType.STATE:
                 self._subagents[agent_type] = create_state_agent()
             elif agent_type == SubagentType.ACTION_SPACE:
                 self._subagents[agent_type] = create_action_space_agent()
             elif agent_type == SubagentType.SCENARIO:
-                self._subagents[agent_type] = create_scenario_agent(
-                    config=self.subagent_config
-                )
+                self._subagents[agent_type] = create_scenario_agent(config=self.subagent_config)
         return self._subagents[agent_type]
 
     def _is_new_deck_request(self, request: OrchestratorRequest) -> bool:
@@ -446,6 +552,47 @@ Keep the response focused and concise while being comprehensive."""
         if request.investigator_id and not request.deck_cards and not request.deck_id:
             # Could be deck creation if asking about building
             if any(word in message_lower for word in ["deck", "build", "start", "create"]):
+                return True
+
+        return False
+
+    def _is_upgrade_request(self, request: OrchestratorRequest) -> bool:
+        """Determine if request is for deck upgrade.
+
+        Checks for upgrade keywords and required context (deck + XP).
+
+        Args:
+            request: The user's request.
+
+        Returns:
+            True if this is a deck upgrade request.
+        """
+        message_lower = request.message.lower()
+
+        # Check for explicit upgrade keywords
+        has_upgrade_keyword = any(keyword in message_lower for keyword in DECK_UPGRADE_KEYWORDS)
+
+        # Must have deck context and XP available
+        has_deck_context = bool(request.deck_cards or request.deck_id)
+        has_xp = bool(request.upgrade_xp and request.upgrade_xp > 0)
+
+        # Explicit upgrade request with required context
+        if has_upgrade_keyword and has_deck_context and has_xp:
+            return True
+
+        # Alternative: If they have deck + XP and ask about upgrades/improvements
+        if has_deck_context and has_xp:
+            upgrade_related_words = [
+                "upgrade",
+                "improve",
+                "better",
+                "replace",
+                "swap",
+                "xp",
+                "experience",
+                "spend",
+            ]
+            if any(word in message_lower for word in upgrade_related_words):
                 return True
 
         return False
@@ -527,28 +674,25 @@ Keep the response focused and concise while being comprehensive."""
             if any(keyword in message_lower for keyword in keywords):
                 agents_to_consult.append(agent_type)
                 matched = [k for k in keywords if k in message_lower]
-                reasoning_parts.append(
-                    f"{agent_type.value}: matched keywords {matched[:2]}"
-                )
+                reasoning_parts.append(f"{agent_type.value}: matched keywords {matched[:2]}")
 
         # Context-based routing additions
         context = state.context
 
         # If deck context is provided, always include state analysis
-        if (context.get("deck_cards") or context.get("deck_id")) and \
-           SubagentType.STATE not in agents_to_consult:
+        if (
+            context.get("deck_cards") or context.get("deck_id")
+        ) and SubagentType.STATE not in agents_to_consult:
             agents_to_consult.append(SubagentType.STATE)
             reasoning_parts.append("state: deck context provided")
 
         # If scenario context is provided, always include scenario analysis
-        if context.get("scenario_name") and \
-           SubagentType.SCENARIO not in agents_to_consult:
+        if context.get("scenario_name") and SubagentType.SCENARIO not in agents_to_consult:
             agents_to_consult.append(SubagentType.SCENARIO)
             reasoning_parts.append("scenario: scenario context provided")
 
         # If asking about specific cards or upgrades with XP, include action space
-        if context.get("upgrade_xp") and \
-           SubagentType.ACTION_SPACE not in agents_to_consult:
+        if context.get("upgrade_xp") and SubagentType.ACTION_SPACE not in agents_to_consult:
             agents_to_consult.append(SubagentType.ACTION_SPACE)
             reasoning_parts.append("action_space: upgrade XP context provided")
 
@@ -697,19 +841,13 @@ Keep the response focused and concise while being comprehensive."""
         # Build context block for synthesis
         context_lines = []
         if state.context.get("investigator_name"):
-            context_lines.append(
-                f"**Investigator**: {state.context['investigator_name']}"
-            )
+            context_lines.append(f"**Investigator**: {state.context['investigator_name']}")
         if state.context.get("deck_id"):
             context_lines.append(f"**Deck ID**: {state.context['deck_id']}")
         if state.context.get("scenario_name"):
-            context_lines.append(
-                f"**Scenario**: {state.context['scenario_name']}"
-            )
+            context_lines.append(f"**Scenario**: {state.context['scenario_name']}")
         if state.context.get("upgrade_xp"):
-            context_lines.append(
-                f"**Available XP**: {state.context['upgrade_xp']}"
-            )
+            context_lines.append(f"**Available XP**: {state.context['upgrade_xp']}")
         context_block = "\n".join(context_lines) if context_lines else "*No specific context*"
 
         # Format subagent responses for synthesis
@@ -745,17 +883,11 @@ Keep the response focused and concise while being comprehensive."""
             ]
             result = self.llm.invoke(messages)
 
-            content = (
-                result.content
-                if isinstance(result.content, str)
-                else str(result.content)
-            )
+            content = result.content if isinstance(result.content, str) else str(result.content)
 
             # Calculate overall confidence
             confidences = [
-                r.response.confidence
-                for r in state.subagent_results
-                if r.success and r.response
+                r.response.confidence for r in state.subagent_results if r.success and r.response
             ]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
 
@@ -770,12 +902,8 @@ Keep the response focused and concise while being comprehensive."""
                 agents_consulted=[a.value for a in state.agents_to_consult],
                 metadata={
                     "routing_reasoning": state.routing_reasoning,
-                    "subagents_successful": sum(
-                        1 for r in state.subagent_results if r.success
-                    ),
-                    "subagents_failed": sum(
-                        1 for r in state.subagent_results if not r.success
-                    ),
+                    "subagents_successful": sum(1 for r in state.subagent_results if r.success),
+                    "subagents_failed": sum(1 for r in state.subagent_results if not r.success),
                 },
             )
 
@@ -802,9 +930,9 @@ Keep the response focused and concise while being comprehensive."""
         import re
 
         patterns = [
-            r'\*\*Recommendation\*\*:\s*(.+?)(?=\n\n|\*\*|$)',
-            r'I recommend\s+(.+?)(?:\.|$)',
-            r'My recommendation is\s+(.+?)(?:\.|$)',
+            r"\*\*Recommendation\*\*:\s*(.+?)(?=\n\n|\*\*|$)",
+            r"I recommend\s+(.+?)(?:\.|$)",
+            r"My recommendation is\s+(.+?)(?:\.|$)",
         ]
 
         for pattern in patterns:
@@ -896,7 +1024,7 @@ Respond in this exact JSON format:
             {
                 "analyze_scenario": "analyze_scenario",
                 "search_cards": "search_cards",
-            }
+            },
         )
 
         graph.add_edge("analyze_scenario", "search_cards")
@@ -940,7 +1068,9 @@ Respond in this exact JSON format:
 
         try:
             messages = [
-                SystemMessage(content="You are a deck building assistant. Extract goals from user requests."),
+                SystemMessage(
+                    content="You are a deck building assistant. Extract goals from user requests."
+                ),
                 HumanMessage(content=prompt),
             ]
             result = self.llm.invoke(messages)
@@ -1039,12 +1169,14 @@ Respond in this exact JSON format:
                 required_cards=required_cards,
             )
 
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="rules",
-                query=f"Get deckbuilding constraints for {name}",
-                success=True,
-                summary=f"Primary: {faction}, Secondary: {secondary_class or 'None'}",
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="rules",
+                    query=f"Get deckbuilding constraints for {name}",
+                    success=True,
+                    summary=f"Primary: {faction}, Secondary: {secondary_class or 'None'}",
+                )
+            )
         else:
             # Fallback with basic constraints
             constraints = InvestigatorConstraints(
@@ -1054,12 +1186,14 @@ Respond in this exact JSON format:
                 deck_size=30,
             )
 
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="rules",
-                query=f"Get deckbuilding constraints for {investigator_id}",
-                success=False,
-                summary="Investigator not found, using defaults",
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="rules",
+                    query=f"Get deckbuilding constraints for {investigator_id}",
+                    success=False,
+                    summary="Investigator not found, using defaults",
+                )
+            )
 
         return {
             "constraints": constraints,
@@ -1107,12 +1241,14 @@ Respond in this exact JSON format:
                 if any(kw in content_lower for kw in keywords):
                     priorities.append(capability)
 
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="scenario",
-                query=f"Analyze {scenario_name}",
-                success=True,
-                summary=f"Priorities: {', '.join(priorities) or 'general'}",
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="scenario",
+                    query=f"Analyze {scenario_name}",
+                    success=True,
+                    summary=f"Priorities: {', '.join(priorities) or 'general'}",
+                )
+            )
 
             return {
                 "scenario_priorities": priorities,
@@ -1120,12 +1256,14 @@ Respond in this exact JSON format:
             }
 
         except Exception as e:
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="scenario",
-                query=f"Analyze {scenario_name}",
-                success=False,
-                summary=str(e),
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="scenario",
+                    query=f"Analyze {scenario_name}",
+                    success=False,
+                    summary=str(e),
+                )
+            )
             return {
                 "scenario_priorities": [],
                 "subagent_results": subagent_results,
@@ -1199,30 +1337,35 @@ Respond in this exact JSON format:
                 for candidate in response.candidates:
                     if candidate.card_id not in seen_card_ids:
                         seen_card_ids.add(candidate.card_id)
-                        all_candidates.append({
-                            "card_id": candidate.card_id,
-                            "name": candidate.name,
-                            "xp_cost": candidate.xp_cost,
-                            "relevance_score": candidate.relevance_score,
-                            "reason": candidate.reason,
-                            "card_type": candidate.card_type,
-                            "class_name": candidate.class_name,
-                            "cost": candidate.cost,
-                            "traits": candidate.traits,
-                            "text": candidate.text,
-                            "search_category": search_name,
-                            "capability": capability,
-                        })
+                        all_candidates.append(
+                            {
+                                "card_id": candidate.card_id,
+                                "name": candidate.name,
+                                "xp_cost": candidate.xp_cost,
+                                "relevance_score": candidate.relevance_score,
+                                "reason": candidate.reason,
+                                "card_type": candidate.card_type,
+                                "class_name": candidate.class_name,
+                                "cost": candidate.cost,
+                                "traits": candidate.traits,
+                                "text": candidate.text,
+                                "search_category": search_name,
+                                "capability": capability,
+                            }
+                        )
 
             except Exception:
                 pass  # Continue with other searches
 
-        subagent_results.append(DeckBuilderSubagentResult(
-            agent_type="action_space",
-            query=f"Search cards for {state.goals.primary_focus if state.goals else 'general'} deck",
-            success=len(all_candidates) > 0,
-            summary=f"Found {len(all_candidates)} candidate cards",
-        ))
+        focus = state.goals.primary_focus if state.goals else "general"
+        subagent_results.append(
+            DeckBuilderSubagentResult(
+                agent_type="action_space",
+                query=f"Search cards for {focus} deck",
+                success=len(all_candidates) > 0,
+                summary=f"Found {len(all_candidates)} candidate cards",
+            )
+        )
 
         return {
             "candidate_cards": all_candidates,
@@ -1267,13 +1410,15 @@ Respond in this exact JSON format:
                 if can_add <= 0:
                     return False
 
-            selected.append(CardSelection(
-                card_id=card_id,
-                name=card["name"],
-                quantity=can_add,
-                reason=card.get("reason", "Matches deck goals"),
-                category=category,
-            ))
+            selected.append(
+                CardSelection(
+                    card_id=card_id,
+                    name=card["name"],
+                    quantity=can_add,
+                    reason=card.get("reason", "Matches deck goals"),
+                    category=category,
+                )
+            )
             card_counts[card_id] = current + can_add
             return True
 
@@ -1403,22 +1548,26 @@ Respond in this exact JSON format:
                 for gap in response.identified_gaps:
                     warnings.append(f"Gap: {gap}")
 
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="state",
-                query="Validate deck composition",
-                success=True,
-                summary=f"Found {len(warnings)} issues",
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="state",
+                    query="Validate deck composition",
+                    success=True,
+                    summary=f"Found {len(warnings)} issues",
+                )
+            )
 
             validation_passed = len(warnings) <= 2  # Allow minor issues
 
         except Exception as e:
-            subagent_results.append(DeckBuilderSubagentResult(
-                agent_type="state",
-                query="Validate deck composition",
-                success=False,
-                summary=str(e),
-            ))
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="state",
+                    query="Validate deck composition",
+                    success=False,
+                    summary=str(e),
+                )
+            )
             validation_passed = True  # Don't block on validation errors
 
         return {
@@ -1462,16 +1611,16 @@ Respond in this exact JSON format:
             cards_by_category[category].append(f"{card.name} x{card.quantity}")
 
         cards_summary = "\n".join(
-            f"- {cat}: {', '.join(cards)}"
-            for cat, cards in cards_by_category.items()
+            f"- {cat}: {', '.join(cards)}" for cat, cards in cards_by_category.items()
         )
 
         # Generate deck name and reasoning via LLM
         try:
+            secondary = state.goals.secondary_focus if state.goals else "None"
             prompt = self.DECK_SYNTHESIS_PROMPT.format(
                 investigator_name=state.constraints.investigator_name,
                 archetype=archetype,
-                goals=f"Primary: {primary}, Secondary: {state.goals.secondary_focus if state.goals else 'None'}",
+                goals=f"Primary: {primary}, Secondary: {secondary}",
                 card_count=state.current_card_count,
                 cards_by_category=cards_summary,
                 warnings=", ".join(state.deck_warnings) if state.deck_warnings else "None",
@@ -1526,6 +1675,746 @@ Respond in this exact JSON format:
 
         return {"response": response}
 
+    # =========================================================================
+    # Deck Upgrade Pipeline Nodes
+    # =========================================================================
+
+    # Prompt for extracting upgrade goals from user message
+    UPGRADE_GOAL_EXTRACTION_PROMPT = """Analyze the user's deck upgrade request \
+and extract their goals.
+
+User's Request: {message}
+Investigator: {investigator_name}
+Available XP: {available_xp}
+
+Extract:
+1. Primary goal: What is the main improvement they want?
+2. Specific requests: List any specific improvements mentioned
+3. Cards to upgrade: Any specific cards mentioned they want to upgrade
+4. Cards to remove: Any cards they specifically want to replace
+5. Avoid: Anything they want to avoid
+
+Respond in this exact JSON format:
+{{
+    "primary_goal": "description of main goal",
+    "specific_requests": ["request1", "request2"],
+    "cards_to_upgrade": ["card1", "card2"],
+    "cards_to_remove": ["card1", "card2"],
+    "avoid_cards": ["thing1", "thing2"]
+}}"""
+
+    UPGRADE_SYNTHESIS_PROMPT = """Generate a summary of upgrade recommendations for this deck.
+
+Investigator: {investigator_name}
+Available XP: {available_xp}
+Upgrade Goals: {goals}
+Current Deck Weaknesses: {weaknesses}
+Current Deck Strengths: {strengths}
+
+Recommended Upgrades:
+{recommendations_summary}
+
+Total XP Spent: {spent_xp}
+Remaining XP: {remaining_xp}
+Warnings: {warnings}
+
+Generate a brief (2-3 sentences) improvement summary explaining:
+1. What the main improvements will be
+2. How the deck will perform better after these upgrades
+
+Respond in this exact JSON format:
+{{
+    "improvement_summary": "Explanation of how the deck will improve."
+}}"""
+
+    def _build_upgrade_graph(self) -> StateGraph:
+        """Build the LangGraph for deck upgrades.
+
+        The graph follows:
+        START -> extract_upgrade_goals -> analyze_current_deck ->
+        [analyze_scenario] -> identify_candidates -> generate_recommendations ->
+        synthesize_upgrade_response -> END
+
+        Returns:
+            Compiled StateGraph ready for upgrade execution.
+        """
+        graph = StateGraph(DeckUpgradeState)
+
+        # Add nodes
+        graph.add_node("extract_upgrade_goals", self._extract_upgrade_goals_node)
+        graph.add_node("analyze_current_deck", self._analyze_current_deck_node)
+        graph.add_node("analyze_scenario_upgrade", self._analyze_scenario_upgrade_node)
+        graph.add_node("identify_candidates", self._identify_upgrade_candidates_node)
+        graph.add_node("generate_recommendations", self._generate_recommendations_node)
+        graph.add_node("synthesize_upgrade_response", self._synthesize_upgrade_response_node)
+
+        # Define edges
+        graph.set_entry_point("extract_upgrade_goals")
+        graph.add_edge("extract_upgrade_goals", "analyze_current_deck")
+
+        # Conditional edge: analyze_scenario only if scenario provided
+        def should_analyze_scenario_upgrade(state: DeckUpgradeState) -> str:
+            if state.context.get("scenario_name"):
+                return "analyze_scenario_upgrade"
+            return "identify_candidates"
+
+        graph.add_conditional_edges(
+            "analyze_current_deck",
+            should_analyze_scenario_upgrade,
+            {
+                "analyze_scenario_upgrade": "analyze_scenario_upgrade",
+                "identify_candidates": "identify_candidates",
+            },
+        )
+
+        graph.add_edge("analyze_scenario_upgrade", "identify_candidates")
+        graph.add_edge("identify_candidates", "generate_recommendations")
+        graph.add_edge("generate_recommendations", "synthesize_upgrade_response")
+        graph.add_edge("synthesize_upgrade_response", END)
+
+        return graph.compile()
+
+    def _extract_upgrade_goals_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Extract upgrade goals from user message.
+
+        Uses LLM to parse the user's upgrade intent.
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with extracted goals.
+        """
+        import json as json_module
+
+        # Build context from request
+        context = {
+            "investigator_id": state.request.investigator_id,
+            "investigator_name": state.request.investigator_name or state.request.investigator_id,
+            "scenario_name": state.request.scenario_name,
+            "upgrade_xp": state.request.upgrade_xp or 0,
+            "deck_cards": state.request.deck_cards,
+        }
+        context = {k: v for k, v in context.items() if v is not None}
+
+        available_xp = state.request.upgrade_xp or 0
+
+        # Format the goal extraction prompt
+        prompt = self.UPGRADE_GOAL_EXTRACTION_PROMPT.format(
+            message=state.request.message,
+            investigator_name=context.get("investigator_name", "Unknown"),
+            available_xp=available_xp,
+        )
+
+        try:
+            messages = [
+                SystemMessage(
+                    content="You are a deck upgrade assistant. Extract goals from user requests."
+                ),
+                HumanMessage(content=prompt),
+            ]
+            result = self.llm.invoke(messages)
+            content = result.content if isinstance(result.content, str) else str(result.content)
+
+            # Parse JSON from response
+            if "{" in content and "}" in content:
+                json_start = content.find("{")
+                json_end = content.rfind("}") + 1
+                json_str = content[json_start:json_end]
+                goals_data = json_module.loads(json_str)
+
+                goals = UpgradeGoals(
+                    primary_goal=goals_data.get("primary_goal", "general improvement"),
+                    specific_requests=goals_data.get("specific_requests", []),
+                    cards_to_upgrade=goals_data.get("cards_to_upgrade", []),
+                    cards_to_remove=goals_data.get("cards_to_remove", []),
+                    avoid_cards=goals_data.get("avoid_cards", []),
+                )
+            else:
+                goals = UpgradeGoals()
+
+        except Exception:
+            goals = UpgradeGoals()
+
+        return {
+            "upgrade_goals": goals,
+            "context": context,
+            "available_xp": available_xp,
+            "investigator_id": state.request.investigator_id or "",
+            "investigator_name": context.get("investigator_name", ""),
+        }
+
+    def _analyze_current_deck_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Analyze current deck using StateAgent.
+
+        Identifies weaknesses, strengths, and cards to prioritize for upgrade.
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with deck analysis.
+        """
+        subagent_results = list(state.subagent_results)
+
+        # Get deck cards from request
+        deck_cards = state.request.deck_cards or []
+        if not deck_cards:
+            return {
+                "error": "No deck cards provided",
+                "deck_weaknesses": ["No deck provided for analysis"],
+            }
+
+        try:
+            state_agent = self._get_subagent(SubagentType.STATE)
+
+            # Convert deck_cards to list format if needed
+            if isinstance(deck_cards, dict):
+                card_list = []
+                for card_id, count in deck_cards.items():
+                    for _ in range(count):
+                        card_list.append(card_id)
+            else:
+                card_list = list(deck_cards)
+
+            state_query = StateQuery(
+                card_list=card_list,
+                investigator_id=state.investigator_id,
+                upgrade_points=state.available_xp,
+            )
+            response = state_agent.analyze(state_query)
+
+            # Extract analysis results
+            weaknesses = response.identified_gaps if hasattr(response, "identified_gaps") else []
+            strengths = response.strengths if hasattr(response, "strengths") else []
+            upgrade_priority = (
+                response.upgrade_priority if hasattr(response, "upgrade_priority") else []
+            )
+
+            # Get investigator name from response if available
+            inv_name = state.investigator_name
+            if hasattr(response, "investigator_name") and response.investigator_name:
+                inv_name = response.investigator_name
+
+            # Store current deck card data for later use
+            current_deck = []
+            from backend.services.chroma_client import ChromaClient
+
+            chroma = ChromaClient()
+            for card_id in card_list:
+                card_data = chroma.get_card(card_id)
+                if card_data:
+                    current_deck.append(card_data)
+
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="state",
+                    query="Analyze current deck for upgrade opportunities",
+                    success=True,
+                    summary=f"Found {len(weaknesses)} weaknesses, {len(strengths)} strengths, "
+                    f"{len(upgrade_priority)} upgrade priorities",
+                )
+            )
+
+            return {
+                "current_deck_cards": current_deck,
+                "deck_weaknesses": weaknesses,
+                "deck_strengths": strengths,
+                "upgrade_priority_cards": upgrade_priority,
+                "investigator_name": inv_name,
+                "subagent_results": subagent_results,
+            }
+
+        except Exception as e:
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="state",
+                    query="Analyze current deck for upgrade opportunities",
+                    success=False,
+                    summary=str(e),
+                )
+            )
+            return {
+                "deck_weaknesses": [],
+                "deck_strengths": [],
+                "upgrade_priority_cards": [],
+                "subagent_results": subagent_results,
+            }
+
+    def _analyze_scenario_upgrade_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Analyze scenario for upgrade priorities (optional).
+
+        Queries ScenarioAgent to get upgrade priorities based on scenario threats.
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with scenario priorities.
+        """
+        scenario_name = state.context.get("scenario_name")
+        if not scenario_name:
+            return {"scenario_priorities": []}
+
+        subagent_results = list(state.subagent_results)
+
+        try:
+            scenario_agent = self._get_subagent(SubagentType.SCENARIO)
+            response = scenario_agent.query(
+                f"What capabilities should I upgrade for {scenario_name}?",
+                state.context,
+            )
+
+            # Extract priorities from response
+            priorities = []
+            content_lower = response.content.lower()
+
+            capability_keywords = {
+                "willpower": ["willpower", "horror", "treachery"],
+                "combat": ["combat", "fight", "enemy", "damage"],
+                "clues": ["clues", "investigate", "intellect"],
+                "agility": ["agility", "evade"],
+                "healing": ["heal", "damage", "horror"],
+            }
+
+            for capability, keywords in capability_keywords.items():
+                if any(kw in content_lower for kw in keywords):
+                    priorities.append(capability)
+
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="scenario",
+                    query=f"Analyze {scenario_name} for upgrade priorities",
+                    success=True,
+                    summary=f"Priorities: {', '.join(priorities) or 'general'}",
+                )
+            )
+
+            return {
+                "scenario_priorities": priorities,
+                "subagent_results": subagent_results,
+            }
+
+        except Exception as e:
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="scenario",
+                    query=f"Analyze {scenario_name} for upgrade priorities",
+                    success=False,
+                    summary=str(e),
+                )
+            )
+            return {
+                "scenario_priorities": [],
+                "subagent_results": subagent_results,
+            }
+
+    def _identify_upgrade_candidates_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Identify upgrade candidates using ActionSpaceAgent.
+
+        Searches for:
+        - Upgraded versions of current deck cards
+        - Cards that address weaknesses
+        - Cards that match scenario priorities
+        - Cards that fit the upgrade goals
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with upgrade candidates.
+        """
+        subagent_results = list(state.subagent_results)
+        action_agent = self._get_subagent(SubagentType.ACTION_SPACE)
+        all_candidates: list[dict[str, Any]] = []
+        seen_card_ids: set[str] = set()
+
+        # Get current deck card IDs to exclude level 0 versions
+        current_card_ids = {
+            card.get("code") or card.get("id", "") for card in state.current_deck_cards
+        }
+
+        # Build list of searches to perform
+        searches = []
+
+        # Search based on upgrade goals
+        if state.upgrade_goals:
+            goal = state.upgrade_goals.primary_goal.lower()
+
+            # Map common goals to capabilities
+            goal_to_capability = {
+                "combat": "combat",
+                "fight": "combat",
+                "damage": "combat",
+                "willpower": "willpower",
+                "horror": "willpower",
+                "clue": "clues",
+                "investigate": "clues",
+                "card draw": "card_draw",
+                "draw": "card_draw",
+                "resource": "economy",
+                "economy": "economy",
+            }
+
+            for keyword, capability in goal_to_capability.items():
+                if keyword in goal:
+                    searches.append(("goal", capability, 15))
+                    break
+            else:
+                # Generic search if no specific capability matched
+                searches.append(("goal", None, 15))
+
+        # Search based on deck weaknesses
+        for weakness in state.deck_weaknesses[:2]:
+            weakness_lower = weakness.lower()
+            if "combat" in weakness_lower:
+                searches.append(("weakness", "combat", 10))
+            elif "clue" in weakness_lower or "investigate" in weakness_lower:
+                searches.append(("weakness", "clues", 10))
+            elif "willpower" in weakness_lower or "horror" in weakness_lower:
+                searches.append(("weakness", "willpower", 10))
+            elif "draw" in weakness_lower or "card" in weakness_lower:
+                searches.append(("weakness", "card_draw", 10))
+            elif "resource" in weakness_lower:
+                searches.append(("weakness", "economy", 10))
+
+        # Search based on scenario priorities
+        for priority in state.scenario_priorities[:2]:
+            searches.append(("scenario", priority, 10))
+
+        # Search for upgraded versions of priority cards
+        for card_name in state.upgrade_priority_cards[:5]:
+            searches.append(("upgrade", card_name, 5))
+
+        # Perform searches
+        for search_name, search_term, limit in searches:
+            try:
+                query = ActionSpaceQuery(
+                    investigator_id=state.investigator_id,
+                    upgrade_points=state.available_xp,
+                    search_query=search_term if search_name == "upgrade" else None,
+                    capability_need=search_term if search_name != "upgrade" else None,
+                    exclude_cards=list(current_card_ids),
+                    limit=limit,
+                )
+                response = action_agent.search(query, state.context)
+
+                for candidate in response.candidates:
+                    if candidate.card_id not in seen_card_ids:
+                        # Only include cards that cost XP (actual upgrades)
+                        if candidate.xp_cost > 0 and candidate.xp_cost <= state.available_xp:
+                            seen_card_ids.add(candidate.card_id)
+                            all_candidates.append(
+                                {
+                                    "card_id": candidate.card_id,
+                                    "name": candidate.name,
+                                    "xp_cost": candidate.xp_cost,
+                                    "relevance_score": candidate.relevance_score,
+                                    "reason": candidate.reason,
+                                    "card_type": candidate.card_type,
+                                    "class_name": candidate.class_name,
+                                    "cost": candidate.cost,
+                                    "traits": candidate.traits,
+                                    "text": candidate.text,
+                                    "search_category": search_name,
+                                    "capability": search_term,
+                                }
+                            )
+
+            except Exception:
+                pass  # Continue with other searches
+
+        subagent_results.append(
+            DeckBuilderSubagentResult(
+                agent_type="action_space",
+                query=f"Search for upgrade candidates within {state.available_xp} XP",
+                success=len(all_candidates) > 0,
+                summary=f"Found {len(all_candidates)} upgrade candidates",
+            )
+        )
+
+        return {
+            "upgrade_candidates": all_candidates,
+            "subagent_results": subagent_results,
+        }
+
+    def _generate_recommendations_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Generate prioritized upgrade recommendations.
+
+        Creates recommendations that:
+        - Stay within XP budget
+        - Prioritize high-impact upgrades
+        - Match upgrade goals and address weaknesses
+        - Identify cards to remove for swaps
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with recommendations.
+        """
+        recommendations: list[UpgradeRecommendation] = []
+        warnings: list[str] = []
+        spent_xp = 0
+        available_xp = state.available_xp
+
+        if available_xp == 0:
+            warnings.append("No XP available for upgrades")
+            return {
+                "recommendations": [],
+                "spent_xp": 0,
+                "warnings": warnings,
+            }
+
+        if not state.upgrade_candidates:
+            warnings.append("No upgrade candidates found within XP budget")
+            return {
+                "recommendations": [],
+                "spent_xp": 0,
+                "warnings": warnings,
+            }
+
+        # Sort candidates by relevance and XP efficiency
+        sorted_candidates = sorted(
+            state.upgrade_candidates,
+            key=lambda c: (c.get("relevance_score", 0), -c.get("xp_cost", 0)),
+            reverse=True,
+        )
+
+        # Build map of current deck cards by name for finding swap targets
+        current_cards_by_name: dict[str, dict] = {}
+        current_cards_by_type: dict[str, list[dict]] = {}
+        for card in state.current_deck_cards:
+            name = card.get("name", "")
+            card_type = card.get("type_name") or card.get("type", "")
+            current_cards_by_name[name.lower()] = card
+            if card_type not in current_cards_by_type:
+                current_cards_by_type[card_type] = []
+            current_cards_by_type[card_type].append(card)
+
+        priority = 1
+        for candidate in sorted_candidates:
+            xp_cost = candidate.get("xp_cost", 0)
+
+            # Check if we can afford this upgrade
+            if spent_xp + xp_cost > available_xp:
+                continue
+
+            card_name = candidate.get("name", "")
+            card_id = candidate.get("card_id", "")
+            card_type = candidate.get("card_type", "")
+
+            # Determine action type and find swap target
+            action = "add"
+            remove_card = None
+            remove_card_name = None
+
+            # Check if this is an upgrade of an existing card (same name, higher level)
+            base_name = card_name.rstrip("0123456789 ")  # Remove level numbers
+            for existing_name, existing_card in current_cards_by_name.items():
+                if base_name.lower() in existing_name or existing_name in base_name.lower():
+                    existing_xp = existing_card.get("xp_cost") or existing_card.get("xp", 0) or 0
+                    if existing_xp < xp_cost:
+                        action = "upgrade"
+                        remove_card = existing_card.get("code") or existing_card.get("id")
+                        remove_card_name = existing_card.get("name")
+                        break
+
+            # If not a direct upgrade, suggest as a swap for a weak card of same type
+            if action == "add" and card_type in current_cards_by_type:
+                # Find a level 0 card of the same type to swap
+                for existing_card in current_cards_by_type[card_type]:
+                    existing_xp = existing_card.get("xp_cost") or existing_card.get("xp", 0) or 0
+                    if existing_xp == 0:
+                        action = "swap"
+                        remove_card = existing_card.get("code") or existing_card.get("id")
+                        remove_card_name = existing_card.get("name")
+                        break
+
+            recommendation = UpgradeRecommendation(
+                priority=priority,
+                action=action,
+                remove_card=remove_card,
+                remove_card_name=remove_card_name,
+                add_card=card_id,
+                add_card_name=card_name,
+                xp_cost=xp_cost,
+                reason=candidate.get("reason", "Improves deck capabilities"),
+            )
+
+            recommendations.append(recommendation)
+            spent_xp += xp_cost
+            priority += 1
+
+            # Stop if we've spent all XP
+            if spent_xp >= available_xp:
+                break
+
+        # Add warnings if relevant
+        remaining_xp = available_xp - spent_xp
+        if remaining_xp > 0 and remaining_xp < available_xp * 0.5:
+            warnings.append(f"Only {remaining_xp} XP remaining - consider other options")
+
+        if len(recommendations) == 0:
+            warnings.append("No upgrades could be made within budget constraints")
+
+        return {
+            "recommendations": recommendations,
+            "spent_xp": spent_xp,
+            "warnings": warnings,
+        }
+
+    def _synthesize_upgrade_response_node(self, state: DeckUpgradeState) -> dict[str, Any]:
+        """Synthesize final upgrade response with summary.
+
+        Uses LLM to generate improvement summary.
+
+        Args:
+            state: Current upgrade state.
+
+        Returns:
+            State update with final UpgradeResponse.
+        """
+        import json as json_module
+
+        # Build recommendations summary for LLM
+        recommendations_summary = []
+        for rec in state.recommendations:
+            if rec.action == "upgrade":
+                recommendations_summary.append(
+                    f"- Upgrade {rec.remove_card_name} to {rec.add_card_name} ({rec.xp_cost} XP)"
+                )
+            elif rec.action == "swap":
+                recommendations_summary.append(
+                    f"- Swap {rec.remove_card_name} for {rec.add_card_name} ({rec.xp_cost} XP)"
+                )
+            else:
+                recommendations_summary.append(f"- Add {rec.add_card_name} ({rec.xp_cost} XP)")
+
+        remaining_xp = state.available_xp - state.spent_xp
+
+        # Generate improvement summary via LLM
+        try:
+            goals_str = (
+                state.upgrade_goals.primary_goal if state.upgrade_goals else "general improvement"
+            )
+            weaknesses_str = (
+                ", ".join(state.deck_weaknesses[:3]) if state.deck_weaknesses else "None identified"
+            )
+            strengths_str = (
+                ", ".join(state.deck_strengths[:3]) if state.deck_strengths else "None identified"
+            )
+            rec_summary_str = (
+                "\n".join(recommendations_summary)
+                if recommendations_summary
+                else "No upgrades recommended"
+            )
+            prompt = self.UPGRADE_SYNTHESIS_PROMPT.format(
+                investigator_name=state.investigator_name,
+                available_xp=state.available_xp,
+                goals=goals_str,
+                weaknesses=weaknesses_str,
+                strengths=strengths_str,
+                recommendations_summary=rec_summary_str,
+                spent_xp=state.spent_xp,
+                remaining_xp=remaining_xp,
+                warnings=", ".join(state.warnings) if state.warnings else "None",
+            )
+
+            messages = [
+                SystemMessage(
+                    content="You are a deck upgrade assistant. Summarize the improvements."
+                ),
+                HumanMessage(content=prompt),
+            ]
+            result = self.llm.invoke(messages)
+            content = result.content if isinstance(result.content, str) else str(result.content)
+
+            # Parse JSON response
+            if "{" in content and "}" in content:
+                json_start = content.find("{")
+                json_end = content.rfind("}") + 1
+                json_str = content[json_start:json_end]
+                synthesis_data = json_module.loads(json_str)
+                improvement_summary = synthesis_data.get(
+                    "improvement_summary",
+                    "Recommended upgrades will improve overall deck performance.",
+                )
+            else:
+                improvement_summary = "Recommended upgrades will improve overall deck performance."
+
+        except Exception:
+            improvement_summary = "Recommended upgrades will improve overall deck performance."
+
+        # Calculate confidence
+        if state.recommendations:
+            confidence = min(0.9, 0.5 + len(state.recommendations) * 0.1)
+        else:
+            confidence = 0.3
+
+        response = UpgradeResponse(
+            recommendations=state.recommendations,
+            total_xp_cost=state.spent_xp,
+            remaining_xp=remaining_xp,
+            available_xp=state.available_xp,
+            deck_improvement_summary=improvement_summary,
+            investigator_id=state.investigator_id,
+            investigator_name=state.investigator_name,
+            warnings=state.warnings,
+            confidence=confidence,
+            subagent_results=state.subagent_results,
+            metadata={
+                "upgrade_goals": state.upgrade_goals.model_dump() if state.upgrade_goals else {},
+                "scenario_priorities": state.scenario_priorities,
+                "deck_weaknesses": state.deck_weaknesses,
+                "deck_strengths": state.deck_strengths,
+            },
+        )
+
+        return {"response": response}
+
+    def _process_upgrade(
+        self,
+        request: OrchestratorRequest,
+    ) -> UpgradeResponse:
+        """Process a deck upgrade request.
+
+        Args:
+            request: The user's upgrade request.
+
+        Returns:
+            UpgradeResponse with upgrade recommendations.
+        """
+        try:
+            # Build the upgrade graph if not cached
+            if not hasattr(self, "_upgrade_graph"):
+                self._upgrade_graph = self._build_upgrade_graph()
+
+            # Create initial state
+            initial_state = DeckUpgradeState(request=request)
+
+            # Execute the graph
+            final_state = self._upgrade_graph.invoke(initial_state)
+
+            # Extract response
+            if isinstance(final_state, dict) and "response" in final_state:
+                response = final_state["response"]
+                if isinstance(response, UpgradeResponse):
+                    return response
+
+            return UpgradeResponse.error_response(
+                error_message="Unexpected upgrade output format",
+                investigator_id=request.investigator_id or "",
+                available_xp=request.upgrade_xp or 0,
+            )
+
+        except Exception as e:
+            return UpgradeResponse.error_response(
+                error_message=f"Upgrade analysis failed: {e}",
+                investigator_id=request.investigator_id or "",
+                available_xp=request.upgrade_xp or 0,
+            )
+
     def _process_new_deck(
         self,
         request: OrchestratorRequest,
@@ -1566,11 +2455,14 @@ Respond in this exact JSON format:
                 investigator_id=request.investigator_id or "",
             )
 
-    def process(self, request: OrchestratorRequest) -> OrchestratorResponse | NewDeckResponse:
+    def process(
+        self, request: OrchestratorRequest
+    ) -> OrchestratorResponse | NewDeckResponse | UpgradeResponse:
         """Process a user request through the orchestrator.
 
         This is the main interface for invoking the orchestrator.
         Dispatches to the appropriate flow based on request type:
+        - Deck upgrade flow for upgrade requests (deck + XP + upgrade intent)
         - New deck creation flow for deck building requests
         - General Q&A flow for other requests
 
@@ -1578,9 +2470,13 @@ Respond in this exact JSON format:
             request: The user's request with context.
 
         Returns:
-            OrchestratorResponse or NewDeckResponse with results.
+            OrchestratorResponse, NewDeckResponse, or UpgradeResponse with results.
         """
         try:
+            # Check if this is a deck upgrade request (check first - more specific)
+            if self._is_upgrade_request(request):
+                return self._process_upgrade(request)
+
             # Check if this is a new deck creation request
             if self._is_new_deck_request(request):
                 return self._process_new_deck(request)
@@ -1601,9 +2497,7 @@ Respond in this exact JSON format:
             )
 
         except Exception as e:
-            return OrchestratorResponse.error_response(
-                error_message=f"Orchestration failed: {e}"
-            )
+            return OrchestratorResponse.error_response(error_message=f"Orchestration failed: {e}")
 
     async def aprocess(self, request: OrchestratorRequest) -> OrchestratorResponse:
         """Async version of process.
@@ -1692,8 +2586,20 @@ def process_chat_message(
     orchestrator = create_orchestrator()
     response = orchestrator.process(request)
 
-    # Handle both OrchestratorResponse and NewDeckResponse
-    if isinstance(response, NewDeckResponse):
+    # Handle OrchestratorResponse, NewDeckResponse, and UpgradeResponse
+    if isinstance(response, UpgradeResponse):
+        # For deck upgrades, summarize the recommendations
+        if response.recommendations:
+            rec_summary = ", ".join(
+                f"{r.add_card_name} ({r.xp_cost} XP)" for r in response.recommendations[:3]
+            )
+            reply = f"Upgrade Recommendations ({response.total_xp_cost} XP): {rec_summary}"
+            if len(response.recommendations) > 3:
+                reply += f" and {len(response.recommendations) - 3} more..."
+        else:
+            reply = response.deck_improvement_summary
+        agents_consulted = [r.agent_type for r in response.subagent_results]
+    elif isinstance(response, NewDeckResponse):
         # For deck building, use deck_name as the reply summary
         reply = f"{response.deck_name}: {response.reasoning}"
         agents_consulted = [r.agent_type for r in response.subagent_results]
