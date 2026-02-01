@@ -2,13 +2,40 @@ import { useState, useRef, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useDeck } from '../context/DeckContext';
 import Button from './common/Button';
+import DeckProposal from './DeckProposal';
 import './ChatWindow.css';
 
 export default function ChatWindow({ onOpenSimulation }) {
   const [input, setInput] = useState('');
+  const [dismissedProposals, setDismissedProposals] = useState(new Set());
   const messagesEndRef = useRef(null);
   const { messages, loading, sendMessage, analyzeDeck, suggestSwaps, runSimulation } = useChat();
-  const { activeDeck } = useDeck();
+  const { activeDeck, setActiveDeck, setSelectedInvestigator } = useDeck();
+
+  // Helper to detect if structuredData contains a NewDeckResponse
+  const isNewDeckResponse = (structuredData) => {
+    return structuredData &&
+      Array.isArray(structuredData.cards) &&
+      structuredData.cards.length > 0 &&
+      structuredData.cards[0]?.card_id;
+  };
+
+  // Handle accepting a proposed deck
+  const handleAcceptDeck = (deckData) => {
+    // Create a new active deck from the proposal
+    setActiveDeck({
+      id: `ai-${Date.now()}`,
+      name: deckData.name,
+      investigator_id: deckData.investigator_id,
+      investigator_name: deckData.investigator_name,
+      cards: deckData.cards,
+    });
+  };
+
+  // Handle dismissing a proposal
+  const handleDismissProposal = (messageId) => {
+    setDismissedProposals(prev => new Set([...prev, messageId]));
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,6 +134,17 @@ export default function ChatWindow({ onOpenSimulation }) {
             <div className="message-content">
               {message.content}
             </div>
+
+            {/* Show DeckProposal for NewDeckResponse structured data */}
+            {message.structuredData &&
+              isNewDeckResponse(message.structuredData) &&
+              !dismissedProposals.has(message.id) && (
+              <DeckProposal
+                proposal={message.structuredData}
+                onAccept={handleAcceptDeck}
+                onClose={() => handleDismissProposal(message.id)}
+              />
+            )}
 
             {message.recommendations && message.recommendations.length > 0 && (
               <div className="recommendations">

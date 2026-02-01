@@ -1,0 +1,219 @@
+.deck-proposal {
+  background: var(--bg-secondary, #1f2937);
+  border: 1px solid var(--border-color, #374151);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.5rem 0;
+}
+
+.proposal-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color, #374151);
+}
+
+.proposal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.proposal-title h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--text-primary, #f9fafb);
+}
+
+.archetype-badge {
+  padding: 0.125rem 0.5rem;
+  background: var(--primary-color, #6366f1);
+  color: white;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.proposal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.investigator-name {
+  font-weight: 500;
+  color: var(--text-primary, #f9fafb);
+}
+
+.card-count {
+  color: var(--text-muted, #6b7280);
+}
+
+.confidence-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.confidence-badge.high {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.confidence-badge.medium {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.confidence-badge.low {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.proposal-warnings {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.proposal-warnings h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: #ef4444;
+}
+
+.proposal-warnings ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-primary, #f9fafb);
+}
+
+.proposal-warnings li {
+  margin-bottom: 0.25rem;
+}
+
+.proposal-reasoning {
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.proposal-reasoning h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--primary-color, #6366f1);
+}
+
+.proposal-reasoning p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-primary, #f9fafb);
+  line-height: 1.5;
+}
+
+.proposal-cards {
+  margin-bottom: 1rem;
+}
+
+.proposal-cards h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-category {
+  margin-bottom: 0.75rem;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg-primary, #111827);
+  border-radius: 4px;
+  margin-bottom: 0.375rem;
+}
+
+.category-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary, #f9fafb);
+  text-transform: capitalize;
+}
+
+.category-count {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
+}
+
+.category-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.proposal-card {
+  padding: 0.375rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.proposal-card:hover {
+  background: var(--bg-primary, #111827);
+}
+
+.proposal-card.expanded {
+  background: var(--bg-primary, #111827);
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-quantity {
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  min-width: 1.5rem;
+}
+
+.card-name {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--text-primary, #f9fafb);
+}
+
+.expand-icon {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6b7280);
+  width: 1rem;
+  text-align: center;
+}
+
+.card-reason {
+  margin-top: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  padding-left: 2rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #9ca3af);
+  border-left: 2px solid var(--primary-color, #6366f1);
+}
+
+.proposal-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, #374151);
+}
