@@ -171,10 +171,51 @@
 
 .chat-input-container {
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 1rem;
   border-top: 2px solid #e5e7eb;
   background: white;
+}
+
+.xp-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.xp-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.xp-input {
+  width: 60px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.xp-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #4f46e5);
+}
+
+.xp-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted, #9ca3af);
+  font-style: italic;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.75rem;
 }
 
 .chat-input {
@@ -253,6 +294,16 @@
 
   .chat-input:disabled {
     background: #374151;
+  }
+
+  .xp-input {
+    background: #111827;
+    border-color: #4b5563;
+    color: white;
+  }
+
+  .xp-input:focus {
+    border-color: #6366f1;
   }
 }
 

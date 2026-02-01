@@ -7,6 +7,7 @@ import './ChatWindow.css';
 
 export default function ChatWindow({ onOpenSimulation }) {
   const [input, setInput] = useState('');
+  const [upgradeXp, setUpgradeXp] = useState('');
   const [dismissedProposals, setDismissedProposals] = useState(new Set());
   const messagesEndRef = useRef(null);
   const { messages, loading, sendMessage, analyzeDeck, suggestSwaps, runSimulation } = useChat();
@@ -17,6 +18,7 @@ export default function ChatWindow({ onOpenSimulation }) {
     deckId: activeDeck?.id,
     investigatorId: selectedInvestigator?.id || activeDeck?.investigator_id,
     investigatorName: selectedInvestigator?.name || activeDeck?.investigator_name,
+    upgradeXp: upgradeXp ? parseInt(upgradeXp, 10) : null,
   });
 
   // Helper to detect if structuredData contains a NewDeckResponse
@@ -204,22 +206,42 @@ export default function ChatWindow({ onOpenSimulation }) {
       </div>
 
       <div className="chat-input-container">
-        <textarea
-          className="chat-input"
-          placeholder="Ask about your deck or request analysis..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={loading}
-          rows={2}
-        />
-        <Button
-          onClick={handleSend}
-          disabled={!input.trim() || loading}
-          variant="primary"
-        >
-          Send
-        </Button>
+        {activeDeck && (
+          <div className="xp-input-row">
+            <label className="xp-label">
+              Available XP:
+              <input
+                type="number"
+                className="xp-input"
+                min="0"
+                max="50"
+                value={upgradeXp}
+                onChange={(e) => setUpgradeXp(e.target.value)}
+                placeholder="0"
+                disabled={loading}
+              />
+            </label>
+            <span className="xp-hint">Set for upgrade recommendations</span>
+          </div>
+        )}
+        <div className="input-row">
+          <textarea
+            className="chat-input"
+            placeholder="Ask about your deck or request analysis..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={loading}
+            rows={2}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || loading}
+            variant="primary"
+          >
+            Send
+          </Button>
+        </div>
       </div>
     </div>
   );
