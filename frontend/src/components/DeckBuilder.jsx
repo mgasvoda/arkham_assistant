@@ -396,36 +396,54 @@ export default function DeckBuilder({ onCardClick }) {
                 </div>
                 <div className="group-cards">
                   {cards.map((card) => (
-                    <div 
-                      key={card.code} 
-                      className={`deck-card-item class-${(card.class_name || 'neutral').toLowerCase()}`}
+                    <div
+                      key={card.code}
+                      className={`deck-card-tile faction-${(card.class_name || 'neutral').toLowerCase()}`}
+                      onClick={() => onCardClick && onCardClick(card)}
                     >
-                      <div 
-                        className="card-visual"
-                        onClick={() => onCardClick && onCardClick(card)}
-                        style={{ cursor: onCardClick ? 'pointer' : 'default' }}
-                      >
-                        <div className="card-visual-header">
-                          <span className="card-visual-name">{card.name || card.real_name}</span>
-                          {card.cost !== undefined && card.cost !== null && (
-                            <span className="card-visual-cost">{card.cost}</span>
+                      <div className="card-tile-image">
+                        <img
+                          src={`https://arkhamdb.com/bundles/cards/${card.code}.png`}
+                          alt={card.name || card.real_name}
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                        <div className="card-tile-placeholder" style={{ display: 'none' }}>
+                          <span className="placeholder-icon">🎴</span>
+                        </div>
+                        <div className="card-tile-quantity">×{card.quantity}</div>
+                        {card.cost !== undefined && card.cost !== null && (
+                          <div className="card-tile-cost">{card.cost}</div>
+                        )}
+                      </div>
+                      <div className="card-tile-content">
+                        <h4 className="card-tile-name">{card.name || card.real_name}</h4>
+                        <div className="card-tile-meta">
+                          <span className={`card-tile-class faction-${(card.class_name || 'neutral').toLowerCase()}`}>
+                            {card.class_name || 'Neutral'}
+                          </span>
+                          {card.type_name && (
+                            <span className="card-tile-type">{card.type_name}</span>
                           )}
                         </div>
-                        {card.class_name && (
-                          <span className={`card-visual-class ${card.class_name.toLowerCase()}`}>
-                            {card.class_name}
-                          </span>
+                        {card.traits && (
+                          <p className="card-tile-traits">{card.traits}</p>
                         )}
-                        <div className="card-visual-quantity">×{card.quantity}</div>
+                        {card.text && (
+                          <p className="card-tile-text" dangerouslySetInnerHTML={{ __html: card.text }} />
+                        )}
                       </div>
-                      <div className="card-actions">
+                      <div className="card-tile-actions">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             removeCard(card.code, 1);
                           }}
-                          className="action-btn remove"
-                          title="Remove one"
+                          className="tile-action-btn remove"
+                          title="Remove one copy"
                         >
                           −
                         </button>
@@ -434,8 +452,8 @@ export default function DeckBuilder({ onCardClick }) {
                             e.stopPropagation();
                             addCard(card, 1);
                           }}
-                          className="action-btn add"
-                          title="Add one"
+                          className="tile-action-btn add"
+                          title="Add one copy"
                         >
                           +
                         </button>
