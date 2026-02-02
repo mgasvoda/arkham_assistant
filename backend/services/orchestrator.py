@@ -43,6 +43,11 @@ from backend.services.subagents import (
     create_scenario_agent,
     create_state_agent,
 )
+from backend.services.validators.deck_validator import (
+    DeckValidator,
+    get_investigator_constraints,
+)
+from backend.models.deck_constraints import DeckBuildingRules, ClassAccess
 
 logger = get_logger(__name__)
 
@@ -497,6 +502,7 @@ Keep the response focused and concise while being comprehensive."""
         self.llm = self._create_llm()
         self.graph = self._build_graph()
         self._subagents: dict[SubagentType, Any] = {}
+        self._deck_validator = DeckValidator()
 
     def _create_llm(self) -> ChatOpenAI:
         """Create the LLM instance for synthesis.
@@ -1441,15 +1447,54 @@ Respond in this exact JSON format:
             "subagent_results": subagent_results,
         }
 
+    def _constraints_to_rules(
+        self, constraints: InvestigatorConstraints
+    ) -> DeckBuildingRules:
+        """Convert InvestigatorConstraints to DeckBuildingRules for validation.
+
+        The InvestigatorConstraints model uses a simpler primary/secondary pattern,
+        while DeckBuildingRules supports flexible multi-class access lists.
+
+        Args:
+            constraints: The orchestrator's constraint model.
+
+        Returns:
+            DeckBuildingRules suitable for DeckValidator.
+        """
+        deck_options = [
+            ClassAccess(faction=constraints.primary_class, max_level=5),
+            ClassAccess(faction="Neutral", max_level=5),
+        ]
+        if constraints.secondary_class:
+            deck_options.append(
+                ClassAccess(
+                    faction=constraints.secondary_class,
+                    max_level=constraints.secondary_level,
+                )
+            )
+
+        return DeckBuildingRules(
+            investigator_code=constraints.investigator_id,
+            name=constraints.investigator_name,
+            deck_size=constraints.deck_size,
+            deck_options=deck_options,
+            signature_cards=constraints.required_cards,
+            weakness_cards=[],  # Not tracked in InvestigatorConstraints
+            special_rules=constraints.special_rules or None,
+        )
+
     def _build_deck_node(self, state: DeckBuilderState) -> dict[str, Any]:
         """Build the deck from candidate cards.
 
-        Algorithmic card selection:
+        Algorithmic card selection with validation:
         1. Add signature cards (required)
-        2. Add primary focus cards (8-12)
-        3. Add secondary focus cards (4-8)
-        4. Add economy cards (4-6)
-        5. Fill remaining slots
+        2. Add primary focus cards (8-12) - filtered by validator
+        3. Add secondary focus cards (4-8) - filtered by validator
+        4. Add economy cards (4-6) - filtered by validator
+        5. Fill remaining slots - filtered by validator
+
+        Cards are validated against investigator deckbuilding rules before
+        being added. Invalid cards are silently skipped.
 
         Args:
             state: Current deck builder state.
@@ -1464,8 +1509,14 @@ Respond in this exact JSON format:
         selected: list[CardSelection] = []
         card_counts: dict[str, int] = {}  # track copies per card
 
+        # Convert constraints for validation
+        rules = self._constraints_to_rules(state.constraints)
+
         def add_card(card: dict, quantity: int, category: str) -> bool:
-            """Add card to deck if possible."""
+            """Add card to deck if possible and valid.
+
+            Validates against deckbuilding rules before adding.
+            """
             card_id = card["card_id"]
             current = card_counts.get(card_id, 0)
             can_add = min(2 - current, quantity)
@@ -1478,6 +1529,18 @@ Respond in this exact JSON format:
                 can_add = deck_size - current_total
                 if can_add <= 0:
                     return False
+
+            # Validate card against investigator rules
+            validation_errors = self._deck_validator.validate_single_card(
+                card, rules, is_initial_deck=True
+            )
+            if validation_errors:
+                # Card is not legal for this investigator, skip it
+                logger.debug(
+                    f"Skipping invalid card {card.get('name', card_id)}: "
+                    f"{validation_errors[0].message}"
+                )
+                return False
 
             selected.append(
                 CardSelection(
@@ -1570,14 +1633,14 @@ Respond in this exact JSON format:
         }
 
     def _validate_deck_node(self, state: DeckBuilderState) -> dict[str, Any]:
-        """Validate deck composition using StateAgent.
+        """Validate deck composition using DeckValidator and StateAgent.
 
-        Checks for:
-        - Identified gaps in capabilities
-        - Overall deck health
-        - Warnings about the build
+        Two-phase validation:
+        1. Hard rules (DeckValidator): deck size, copy limits, class restrictions
+        2. Soft analysis (StateAgent): gaps, synergies, warnings
 
-        Also parses gaps into capability keywords for the refinement loop.
+        Hard rule violations are blocking errors. Soft analysis produces warnings
+        and identifies gaps for the refinement loop.
 
         Args:
             state: Current deck builder state.
@@ -1587,6 +1650,7 @@ Respond in this exact JSON format:
         """
         subagent_results = list(state.subagent_results)
         warnings: list[str] = []
+        hard_errors: list[str] = []
         gaps_to_fill: list[str] = []
 
         # Map gap descriptions to capability search terms
@@ -1600,8 +1664,56 @@ Respond in this exact JSON format:
             "healing": "healing",
         }
 
-        # Check card count
         deck_size = state.constraints.deck_size if state.constraints else 30
+
+        # =====================================================================
+        # Phase 1: Hard Rule Validation (DeckValidator)
+        # =====================================================================
+        if state.constraints:
+            rules = self._constraints_to_rules(state.constraints)
+
+            # Build deck dict and card details for validator
+            deck_cards: dict[str, int] = {}
+            card_details: list[dict] = []
+            for card in state.selected_cards:
+                deck_cards[card.card_id] = deck_cards.get(card.card_id, 0) + card.quantity
+                # We need card faction/xp for validation - use what we have
+                card_details.append({
+                    "code": card.card_id,
+                    "name": card.name,
+                    # Note: Full card data would come from ChromaDB lookup
+                    # For now, cards were pre-validated in _build_deck_node
+                })
+
+            validation_result = self._deck_validator.validate(
+                {"cards": deck_cards},
+                card_details,
+                rules,
+                is_initial_deck=True,
+            )
+
+            # Add hard errors
+            for error in validation_result.errors:
+                hard_errors.append(f"[RULE] {error.message}")
+
+            # Add validator warnings
+            for warning in validation_result.warnings:
+                warnings.append(f"[CHECK] {warning.message}")
+
+            subagent_results.append(
+                DeckBuilderSubagentResult(
+                    agent_type="validator",
+                    query="Hard rule validation",
+                    success=validation_result.valid,
+                    summary=validation_result.summary(),
+                )
+            )
+
+        # =====================================================================
+        # Phase 2: Soft Analysis (StateAgent)
+        # =====================================================================
+
+        # Check card count (soft warning version)
         if state.current_card_count < deck_size:
             warnings.append(
                 f"Deck has {state.current_card_count} cards, needs {deck_size}"
@@ -1643,11 +1755,9 @@ Respond in this exact JSON format:
                     agent_type="state",
                     query=f"Validate deck composition (iteration {state.iteration_count + 1})",
                     success=True,
-                    summary=f"Found {len(warnings)} issues, {len(gaps_to_fill)} fillable gaps",
+                    summary=f"Found {len(warnings)} soft issues, {len(gaps_to_fill)} fillable gaps",
                 )
             )
-
-            validation_passed = len(warnings) <= 2  # Allow minor issues
 
         except Exception as e:
             subagent_results.append(
@@ -1658,10 +1768,19 @@ Respond in this exact JSON format:
                     summary=str(e),
                 )
             )
-            validation_passed = True  # Don't block on validation errors
+
+        # Determine validation outcome:
+        # - Hard errors (rule violations) are blocking
+        # - Soft warnings allow up to 2 minor issues
+        has_hard_errors = len(hard_errors) > 0
+        has_many_soft_warnings = len(warnings) > 2
+        validation_passed = not has_hard_errors and not has_many_soft_warnings
+
+        # Combine hard errors and soft warnings for display
+        all_warnings = hard_errors + warnings
 
         return {
-            "deck_warnings": warnings,
+            "deck_warnings": all_warnings,
             "validation_passed": validation_passed,
             "gaps_to_fill": gaps_to_fill,
             "iteration_count": state.iteration_count + 1,
