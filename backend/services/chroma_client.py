@@ -132,8 +132,70 @@ class ChromaClient:
         self.cards.upsert(ids=[card_id], documents=[name], metadatas=[card])
 
     # Deck operations
+    def _enrich_deck_cards(self, cards: list[dict]) -> list[dict]:
+        """Enrich deck cards with full card data from the cards collection.
+
+        Maps backend field names to frontend expected names:
+        - type -> type_name
+        - class -> class_name
+        - traits (JSON array) -> traits (dot-separated string)
+        """
+        import json
+
+        enriched = []
+        for deck_card in cards:
+            code = deck_card.get("code")
+            quantity = deck_card.get("quantity", 1)
+
+            # Look up full card data
+            full_card = self.get_card(code) if code else None
+
+            if full_card:
+                # Build enriched card with frontend-expected field names
+                enriched_card = {
+                    "code": code,
+                    "name": full_card.get("name", deck_card.get("name", "")),
+                    "real_name": full_card.get("name", deck_card.get("name", "")),
+                    "quantity": quantity,
+                    "cost": full_card.get("cost"),
+                    "type_name": full_card.get("type", ""),
+                    "class_name": full_card.get("class", "Neutral"),
+                    "text": full_card.get("text", ""),
+                }
+
+                # Parse traits from JSON string to dot-separated string
+                traits_raw = full_card.get("traits", "")
+                if traits_raw:
+                    try:
+                        traits_list = json.loads(traits_raw)
+                        if isinstance(traits_list, list):
+                            enriched_card["traits"] = ". ".join(traits_list) + "."
+                        else:
+                            enriched_card["traits"] = traits_raw
+                    except (json.JSONDecodeError, TypeError):
+                        enriched_card["traits"] = traits_raw
+                else:
+                    enriched_card["traits"] = ""
+
+                enriched.append(enriched_card)
+            else:
+                # Card not found in collection, use whatever data we have
+                enriched.append({
+                    "code": code,
+                    "name": deck_card.get("name", "Unknown Card"),
+                    "real_name": deck_card.get("name", "Unknown Card"),
+                    "quantity": quantity,
+                    "cost": deck_card.get("cost"),
+                    "type_name": deck_card.get("type_name", deck_card.get("type", "")),
+                    "class_name": deck_card.get("class_name", deck_card.get("class", "Neutral")),
+                    "traits": deck_card.get("traits", ""),
+                    "text": deck_card.get("text", ""),
+                })
+
+        return enriched
+
     def get_deck(self, deck_id: str) -> dict | None:
-        """Fetch single deck with full metadata."""
+        """Fetch single deck with full metadata and enriched card data."""
         import json
 
         try:
@@ -148,6 +210,9 @@ class ChromaClient:
                         deck_data["cards"] = json.loads(deck_data["cards"])
                     except (json.JSONDecodeError, TypeError):
                         pass
+                # Enrich cards with full data from cards collection
+                if "cards" in deck_data and isinstance(deck_data["cards"], list):
+                    deck_data["cards"] = self._enrich_deck_cards(deck_data["cards"])
                 return deck_data
             return None
         except Exception:
@@ -159,7 +224,7 @@ class ChromaClient:
             return None
 
     def list_decks(self) -> list[dict]:
-        """Return all decks."""
+        """Return all decks with enriched card data."""
         import json
 
         try:
@@ -175,6 +240,9 @@ class ChromaClient:
                         deck_data["cards"] = json.loads(deck_data["cards"])
                     except (json.JSONDecodeError, TypeError):
                         pass
+                # Enrich cards with full data from cards collection
+                if "cards" in deck_data and isinstance(deck_data["cards"], list):
+                    deck_data["cards"] = self._enrich_deck_cards(deck_data["cards"])
                 decks.append(deck_data)
             return decks
         except Exception:
