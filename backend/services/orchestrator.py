@@ -48,6 +48,7 @@ from backend.services.validators.deck_validator import (
     get_investigator_constraints,
 )
 from backend.models.deck_constraints import DeckBuildingRules, ClassAccess
+from backend.services.context_builder import ContextBuilder, get_context_builder
 
 logger = get_logger(__name__)
 
@@ -503,6 +504,7 @@ Keep the response focused and concise while being comprehensive."""
         self.graph = self._build_graph()
         self._subagents: dict[SubagentType, Any] = {}
         self._deck_validator = DeckValidator()
+        self._context_builder = get_context_builder()
 
     def _create_llm(self) -> ChatOpenAI:
         """Create the LLM instance for synthesis.
@@ -1001,6 +1003,8 @@ Respond in this exact JSON format:
 
     DECK_SYNTHESIS_PROMPT = """Generate a deck name and overall reasoning for this deck build.
 
+{doctrine_context}
+
 Investigator: {investigator_name}
 Archetype: {archetype}
 Goals: {goals}
@@ -1010,9 +1014,10 @@ Selected Cards by Category:
 
 Warnings/Concerns: {warnings}
 
-Generate:
+Using the strategic doctrine above (if provided), generate:
 1. A creative deck name (2-4 words) that captures the theme
 2. A brief overall reasoning (2-3 sentences) explaining the deck's strategy
+   - Reference relevant doctrine principles where applicable
 
 Respond in this exact JSON format:
 {{
@@ -1995,8 +2000,21 @@ Respond in this exact JSON format:
 
         # Generate deck name and reasoning via LLM
         try:
+            # Get doctrine context for the investigator's class
+            doctrine_context = ""
+            try:
+                primary_class = state.constraints.primary_class
+                doctrine_context = self._context_builder.get_context_for_class(
+                    primary_class,
+                    include_foundations=True,
+                    max_sections=3,  # Keep context focused
+                )
+            except Exception as ctx_err:
+                logger.debug(f"Could not load doctrine context: {ctx_err}")
+
             secondary = state.goals.secondary_focus if state.goals else "None"
             prompt = self.DECK_SYNTHESIS_PROMPT.format(
+                doctrine_context=doctrine_context,
                 investigator_name=state.constraints.investigator_name,
                 archetype=archetype,
                 goals=f"Primary: {primary}, Secondary: {secondary}",
