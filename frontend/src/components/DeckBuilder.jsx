@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDeck } from '../context/DeckContext';
+import { useDeck, enrichDeckCards } from '../context/DeckContext';
 import { api } from '../api/client';
 import Button from './common/Button';
 import InvestigatorPicker from './InvestigatorPicker';
@@ -221,7 +221,10 @@ export default function DeckBuilder({ onCardClick }) {
     }
   };
 
-  const handleLoadDeck = (deck) => {
+  const handleLoadDeck = async (deck) => {
+    // Enrich cards with full data from cards API
+    const enrichedCards = deck.cards ? await enrichDeckCards(deck.cards) : [];
+
     // Convert backend deck format to frontend format
     setActiveDeck({
       id: deck.id,
@@ -229,7 +232,7 @@ export default function DeckBuilder({ onCardClick }) {
       investigator_id: deck.investigator_code,
       investigator_name: deck.investigator_name,
       investigator_faction: deck.investigator_faction,
-      cards: deck.cards || [],
+      cards: enrichedCards,
       archetype: deck.archetype,
       notes: deck.notes,
     });

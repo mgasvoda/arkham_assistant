@@ -4,6 +4,59 @@ import { mockDeck } from '../mockData';
 
 const DeckContext = createContext();
 
+/**
+ * Enrich a card with full data from the cards API.
+ * Maps backend field names to frontend expected names.
+ */
+async function enrichCard(card) {
+  try {
+    const fullCard = await api.cards.get(card.code);
+    if (!fullCard) {
+      return card;
+    }
+
+    // Parse traits from JSON string to dot-separated string
+    let traits = '';
+    if (fullCard.traits) {
+      try {
+        const traitsArray = JSON.parse(fullCard.traits);
+        if (Array.isArray(traitsArray)) {
+          traits = traitsArray.join('. ') + '.';
+        } else {
+          traits = fullCard.traits;
+        }
+      } catch {
+        traits = fullCard.traits;
+      }
+    }
+
+    return {
+      code: card.code,
+      name: fullCard.name || card.name,
+      real_name: fullCard.name || card.name,
+      quantity: card.quantity || 1,
+      cost: fullCard.cost,
+      type_name: fullCard.type || '',
+      class_name: fullCard.class || 'Neutral',
+      traits,
+      text: fullCard.text || '',
+    };
+  } catch (err) {
+    console.warn(`Failed to enrich card ${card.code}:`, err);
+    return card;
+  }
+}
+
+/**
+ * Enrich all cards in a deck with full data.
+ */
+export async function enrichDeckCards(cards) {
+  if (!cards || !Array.isArray(cards)) {
+    return [];
+  }
+  return Promise.all(cards.map(enrichCard));
+}
+
 export function DeckProvider({ children }) {
   const [activeDeck, setActiveDeck] = useState(null);
   const [selectedInvestigator, setSelectedInvestigator] = useState(null);
@@ -27,6 +80,10 @@ export function DeckProvider({ children }) {
     setError(null);
     try {
       const deck = await api.decks.get(deckId);
+      // Enrich cards with full data from cards API
+      if (deck.cards && Array.isArray(deck.cards)) {
+        deck.cards = await enrichDeckCards(deck.cards);
+      }
       setActiveDeck(deck);
     } catch (err) {
       setError(err.message);
